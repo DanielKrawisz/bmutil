@@ -1,3 +1,10 @@
+// Originally derived from: btcsuite/btcd/wire/internal_test.go
+// Copyright (c) 2013-2015 Conformal Systems LLC.
+
+// Copyright (c) 2015 Monetas
+// Use of this source code is governed by an ISC
+// license that can be found in the LICENSE file.
+
 /*
 This test file is part of the wire.package rather than than the wire.test
 package so it can bridge access to the internals to properly test cases which
