@@ -18,7 +18,7 @@ import (
 
 const (
 	// BMPurposeCode is the purpose code used for HD key derivation.
-	BMPurposeCode = 0x424D3031 + hdkeychain.HardenedKeyStart
+	BMPurposeCode = 0x80000052
 )
 
 // Private contains the identity of the user, which includes private encryption
@@ -30,6 +30,7 @@ type Private struct {
 	ExtraBytes         uint64
 	SigningKey         *btcec.PrivateKey
 	EncryptionKey      *btcec.PrivateKey
+	Behavior           uint32
 }
 
 // ToPublic turns a Private identity object into Public identity object.

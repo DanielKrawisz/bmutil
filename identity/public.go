@@ -21,6 +21,7 @@ type Public struct {
 	ExtraBytes         uint64
 	SigningKey         *btcec.PublicKey
 	EncryptionKey      *btcec.PublicKey
+	Behavior           uint32
 }
 
 // CreateAddress populates the Address object within the identity based on the

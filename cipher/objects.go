@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/monetas/bmutil"
@@ -27,6 +28,35 @@ var (
 	// unable to decrypt the given message.
 	ErrInvalidIdentity = errors.New("invalid supplied identity/decryption failed")
 )
+
+// GeneratePubKey generates a wire.MsgPubKey from the specified private
+// identity. It also signs and encrypts it (if necessary) yielding an object
+// that only needs proof-of-work to be done on it.
+func GeneratePubKey(privID *identity.Private, expiry time.Duration) (*wire.MsgPubKey, error) {
+	addr := &privID.Address
+	if addr.Version < wire.SimplePubKeyVersion ||
+		addr.Version > wire.EncryptedPubKeyVersion {
+		return nil, ErrUnsupportedOp
+	}
+	var signingKey, encKey wire.PubKey
+	sk := privID.SigningKey.PubKey().SerializeUncompressed()[1:]
+	ek := privID.EncryptionKey.PubKey().SerializeUncompressed()[1:]
+	copy(signingKey[:], sk)
+	copy(encKey[:], ek)
+
+	var tag wire.ShaHash
+	copy(tag[:], addr.Tag())
+
+	msg := wire.NewMsgPubKey(0, time.Now().Add(expiry), addr.Version,
+		addr.Stream, privID.Behavior, &signingKey, &encKey,
+		privID.NonceTrialsPerByte, privID.ExtraBytes, nil, &tag, nil)
+	if addr.Version == wire.SimplePubKeyVersion { // We're done.
+		return msg, nil
+	}
+
+	// We still need to sign (and encrypt).
+	return msg, SignAndEncryptPubKey(msg, privID)
+}
 
 // SignAndEncryptPubKey signs and encrypts a MsgPubKey message, populating the
 // Signature and Encrypted fields using the provided private identity.

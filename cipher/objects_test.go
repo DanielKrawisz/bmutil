@@ -36,15 +36,66 @@ func init() {
 
 }
 
-// TestPubKeys tests SignAndEncryptPubKey and TryDecryptAndVerifyPubKey
+// TestPubKeys tests GeneratePubKey, SignAndEncryptPubKey and
+// TryDecryptAndVerifyPubKey
 func TestPubKeys(t *testing.T) {
+	// GeneratePubKey
+
+	// Version 4 address
+	pkMsg, err := GeneratePubKey(privId1, time.Hour*24)
+	if err != nil {
+		t.Error(err)
+	}
+	if pkMsg.Version != privId1.Address.Version {
+		t.Errorf("For version expected %d got %d", privId1.Address.Version,
+			pkMsg.Version)
+	}
+	err = TryDecryptAndVerifyPubKey(pkMsg, &privId1.Address)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Version 3 address
+	v3ID := *privId1
+	v3ID.Address.Version = 3
+	pkMsg, err = GeneratePubKey(&v3ID, time.Hour*24)
+	if err != nil {
+		t.Error(err)
+	}
+	if pkMsg.Version != 3 {
+		t.Errorf("For version expected %d got %d", privId1.Address.Version,
+			pkMsg.Version)
+	}
+	err = TryDecryptAndVerifyPubKey(pkMsg, &v3ID.Address)
+	if err != nil {
+		t.Error(err)
+	}
+
+	// Version 2 address
+	v2ID := *privId1
+	v2ID.Address.Version = 2
+	pkMsg, err = GeneratePubKey(&v2ID, time.Hour*24)
+	if err != nil {
+		t.Error(err)
+	}
+	if pkMsg.Version != 2 {
+		t.Errorf("For version expected %d got %d", privId1.Address.Version,
+			pkMsg.Version)
+	}
+	if !bytes.Equal(v2ID.SigningKey.PubKey().SerializeUncompressed()[1:],
+		pkMsg.SigningKey[:]) ||
+		!bytes.Equal(v2ID.EncryptionKey.PubKey().SerializeUncompressed()[1:],
+			pkMsg.EncryptionKey[:]) {
+		t.Error("Signing/encryption key mismatch.")
+	}
+
 	// SignAndEncryptPubKey
 
 	tag1, _ := wire.NewShaHash(privId1.Address.Tag())
 	pubkey1 := wire.NewMsgPubKey(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 		4, 1, 0, signKey1, encKey1, 1000, 1000, nil, tag1, nil)
 
-	err := SignAndEncryptPubKey(pubkey1, privId1)
+	err = SignAndEncryptPubKey(pubkey1, privId1)
 	if err != nil {
 		t.Errorf("for SignAndEncryptPubKey got error %v", err)
 	}

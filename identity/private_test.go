@@ -145,7 +145,7 @@ func TestNewHD(t *testing.T) {
 	}
 
 	addr, err := pvt.Address.Encode()
-	expectedAddr := "BM-2cUHvGp1gqZj6z9cEqTRyWWNVhtkd5dPWZ"
+	expectedAddr := "BM-2cUqid7xty9zteYmu7aKxYiDTzL4k5YYn7"
 	if err != nil {
 		t.Error("encoding address, got error", err)
 	} else if addr != expectedAddr {
