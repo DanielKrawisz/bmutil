@@ -8,11 +8,11 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/monetas/bmutil"
-	. "github.com/monetas/bmutil/cipher"
-	"github.com/monetas/bmutil/identity"
-	"github.com/monetas/bmutil/pow"
-	"github.com/monetas/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil"
+	. "github.com/DanielKrawisz/bmutil/cipher"
+	"github.com/DanielKrawisz/bmutil/identity"
+	"github.com/DanielKrawisz/bmutil/pow"
+	"github.com/DanielKrawisz/bmutil/wire"
 )
 
 var privId1, privId2 *identity.Private

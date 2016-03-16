@@ -32,7 +32,7 @@ http://localhost:6060/pkg/github.com/monetas/bmutil
 ## Installation
 
 ```bash
-$ go get github.com/monetas/bmutil
+$ go get github.com/DanielKrawisz/bmutil
 ```
 ## License
 

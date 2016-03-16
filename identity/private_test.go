@@ -1,4 +1,5 @@
 // Copyright (c) 2015 Monetas
+// Copyright 2016 Daniel Krawisz.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -9,9 +10,10 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcutil/hdkeychain"
-	"github.com/monetas/bmutil"
-	"github.com/monetas/bmutil/identity"
-	"github.com/monetas/bmutil/pow"
+	"github.com/btcsuite/btcd/chaincfg"
+	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/identity"
+	"github.com/DanielKrawisz/bmutil/pow"
 )
 
 type addressImportExportTest struct {
@@ -134,7 +136,7 @@ func TestNewDeterministic(t *testing.T) {
 func TestNewHD(t *testing.T) {
 	seed := []byte("somegoodrandomseedwouldbeusefulhere")
 
-	masterKey, err := hdkeychain.NewMaster(seed)
+	masterKey, err := hdkeychain.NewMaster(seed, &chaincfg.MainNetParams)
 	if err != nil {
 		t.Fatal(err)
 	}

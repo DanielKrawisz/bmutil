@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/monetas/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/wire"
 )
 
 var pubkey = []wire.PubKey{

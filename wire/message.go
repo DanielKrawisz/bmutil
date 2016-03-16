@@ -2,6 +2,7 @@
 // Copyright (c) 2013-2015 Conformal Systems LLC.
 
 // Copyright (c) 2015 Monetas
+// Copyright 2016 Daniel Krawisz.
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
@@ -13,7 +14,7 @@ import (
 	"io"
 	"unicode/utf8"
 
-	"github.com/monetas/bmutil"
+	"github.com/DanielKrawisz/bmutil"
 )
 
 // MessageHeaderSize is the number of bytes in a bitmessage message header.

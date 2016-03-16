@@ -11,9 +11,9 @@ import (
 	"time"
 
 	"github.com/btcsuite/btcd/btcec"
-	"github.com/monetas/bmutil"
-	"github.com/monetas/bmutil/identity"
-	"github.com/monetas/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/identity"
+	"github.com/DanielKrawisz/bmutil/wire"
 )
 
 var (
