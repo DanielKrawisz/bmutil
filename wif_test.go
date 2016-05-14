@@ -12,8 +12,8 @@ import (
 	"bytes"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/btcsuite/btcd/btcec"
 )
 
 func TestEncodeDecodeWIF(t *testing.T) {

@@ -1,0 +1,10 @@
+package: github.com/DanielKrawisz/bmutil
+import:
+- package: github.com/btcsuite/btcd
+  subpackages:
+  - btcec
+- package: github.com/btcsuite/btcutil
+  subpackages:
+  - base58
+  - hdkeychain
+- package: golang.org/x/crypto/ripemd160

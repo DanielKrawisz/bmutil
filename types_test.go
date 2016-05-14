@@ -14,8 +14,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // MaxMessagePayload is used for testing ReadVarString and ReadVarBytes, to
