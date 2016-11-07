@@ -111,14 +111,14 @@ func readNetAddress(r io.Reader, na *NetAddress, big bool) error {
 
 	if big {
 		var stamp uint64
-		err := readElements(r, &stamp, &stream)
+		err := ReadElements(r, &stamp, &stream)
 		if err != nil {
 			return err
 		}
 		timestamp = time.Unix(int64(stamp), 0)
 	}
 
-	err := readElements(r, &services, &ip)
+	err := ReadElements(r, &services, &ip)
 	if err != nil {
 		return err
 	}
@@ -139,7 +139,7 @@ func readNetAddress(r io.Reader, na *NetAddress, big bool) error {
 // Some messages like version do not include them.
 func writeNetAddress(w io.Writer, na *NetAddress, big bool) error {
 	if big {
-		err := writeElements(w, uint64(na.Timestamp.Unix()), uint32(na.Stream))
+		err := WriteElements(w, uint64(na.Timestamp.Unix()), uint32(na.Stream))
 		if err != nil {
 			return err
 		}
@@ -150,7 +150,7 @@ func writeNetAddress(w io.Writer, na *NetAddress, big bool) error {
 	if na.IP != nil {
 		copy(ip[:], na.IP.To16())
 	}
-	err := writeElements(w, na.Services, ip)
+	err := WriteElements(w, na.Services, ip)
 	if err != nil {
 		return err
 	}

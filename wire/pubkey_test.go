@@ -10,8 +10,8 @@ import (
 	"encoding/hex"
 	"testing"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/btcsuite/btcd/btcec"
 )
 
 // TestPubKey tests the PubKey API.

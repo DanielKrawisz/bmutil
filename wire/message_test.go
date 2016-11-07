@@ -17,8 +17,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/wire/fixed"
+	"github.com/DanielKrawisz/bmutil/wire/obj"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // makeHeader is a convenience function to make a message header in the form of
@@ -84,7 +86,7 @@ func TestMessage(t *testing.T) {
 		t.Fatalf("could not make a ripe hash %s", err)
 	}
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	msgGetPubKey := wire.NewMsgGetPubKey(123123, expires, 2, 1, ripe, nil)
+	msgGetPubKey := obj.NewGetPubKey(123123, expires, 2, 1, ripe, nil)
 
 	pub1Bytes, pub2Bytes := make([]byte, 64), make([]byte, 64)
 	pub2Bytes[0] = 1
@@ -96,12 +98,12 @@ func TestMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create a pubkey %s", err)
 	}
-	msgPubKey := wire.NewMsgPubKey(123123, expires, 2, 1, 0, pub1, pub2, 0, 0, nil, nil, nil)
+	msgPubKey := obj.NewPubKey(123123, expires, 2, 1, 0, pub1, pub2, 0, 0, nil, nil, nil)
 
 	enc := make([]byte, 99)
-	msgMsg := wire.NewMsgMsg(123123, expires, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
+	msgMsg := obj.NewMessage(123123, expires, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
 
-	msgBroadcast := wire.NewMsgBroadcast(123123, expires, 2, 1, nil, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
+	msgBroadcast := obj.NewBroadcast(123123, expires, 2, 1, nil, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
 
 	tests := []struct {
 		in    wire.Message       // Value to encode
@@ -115,10 +117,10 @@ func TestMessage(t *testing.T) {
 		{msgAddr, msgAddr, wire.MainNet, 25},
 		{msgInv, msgInv, wire.MainNet, 25},
 		{msgGetData, msgGetData, wire.MainNet, 25},
-		{msgGetPubKey, msgGetPubKey, wire.MainNet, 66},
-		{msgPubKey, msgPubKey, wire.MainNet, 178},
-		{msgMsg, msgMsg, wire.MainNet, 145},
-		{msgBroadcast, msgBroadcast, wire.MainNet, 145},
+		{msgGetPubKey.MsgObject(), msgGetPubKey.MsgObject(), wire.MainNet, 66},
+		{msgPubKey.MsgObject(), msgPubKey.MsgObject(), wire.MainNet, 178},
+		{msgMsg.MsgObject(), msgMsg.MsgObject(), wire.MainNet, 145},
+		{msgBroadcast.MsgObject(), msgBroadcast.MsgObject(), wire.MainNet, 145},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -417,7 +419,7 @@ func TestReadMessageWireErrors(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Decode from wire.format.
-		r := newFixedReader(test.max, test.buf)
+		r := fixed.NewReader(test.max, test.buf)
 		nr, _, _, err := wire.ReadMessageN(r, test.bmnet)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("ReadMessage #%d wrong error got: %v <%T>, "+
@@ -493,7 +495,7 @@ func TestWriteMessageWireErrors(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode wire.format.
-		w := newFixedWriter(test.max)
+		w := fixed.NewWriter(test.max)
 		nw, err := wire.WriteMessageN(w, test.msg, test.bmnet)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.err) {
 			t.Errorf("WriteMessage #%d wrong error got: %v <%T>, "+
@@ -524,14 +526,14 @@ func TestEncodeMessageAndMessageHash(t *testing.T) {
 	expires := time.Unix(3640198677, 0)
 
 	tests := []struct {
-		msg          wire.Message
+		obj          obj.Object
 		expectedData []byte
 		expectedHash wire.ShaHash
 	}{
 		{ // pub key object message.
 			// We don't need to try every different kind of message since they have their own
 			// individual Encode methods.
-			wire.NewMsgPubKey(543, expires, 4, 1, 2, &pubkey[0], &pubkey[1], 3, 5,
+			obj.NewPubKey(543, expires, 4, 1, 2, &pubkey[0], &pubkey[1], 3, 5,
 				[]byte{4, 5, 6, 7, 8, 9, 10}, &shahash, []byte{11, 12, 13, 14, 15, 16, 17, 18}),
 			[]byte{
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x1f,
@@ -551,8 +553,8 @@ func TestEncodeMessageAndMessageHash(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		encoded := wire.EncodeMessage(test.msg)
-		obj, _ := wire.ToMsgObject(test.msg)
+		obj := test.obj.MsgObject()
+		encoded := wire.EncodeMessage(obj)
 
 		if !bytes.Equal(test.expectedData, encoded) {
 			t.Errorf("On test case %d, expected %v, got %v: ", i, spew.Sdump(test.expectedData), spew.Sdump(encoded))

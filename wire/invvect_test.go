@@ -13,8 +13,8 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // TestInvVect tests the InvVect API.

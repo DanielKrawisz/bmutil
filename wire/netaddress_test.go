@@ -16,8 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/wire/fixed"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // TestNetAddress tests the NetAddress API.
@@ -215,7 +216,7 @@ func TestNetAddressWireErrors(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire.format.
-		w := newFixedWriter(test.max)
+		w := fixed.NewWriter(test.max)
 		err := wire.TstWriteNetAddress(w, test.in, test.ts)
 		if err != test.writeErr {
 			t.Errorf("writeNetAddress #%d wrong error got: %v, want: %v",
@@ -225,7 +226,7 @@ func TestNetAddressWireErrors(t *testing.T) {
 
 		// Decode from wire.format.
 		var na wire.NetAddress
-		r := newFixedReader(test.max, test.buf)
+		r := fixed.NewReader(test.max, test.buf)
 		err = wire.TstReadNetAddress(r, &na, test.ts)
 
 		for _, readErr := range test.readErr {

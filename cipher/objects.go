@@ -10,10 +10,11 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/identity"
 	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/wire/obj"
+	"github.com/btcsuite/btcd/btcec"
 )
 
 var (
@@ -29,13 +30,13 @@ var (
 	ErrInvalidIdentity = errors.New("invalid supplied identity/decryption failed")
 )
 
-// GeneratePubKey generates a wire.MsgPubKey from the specified private
+// GeneratePubKey generates a obj.PubKey from the specified private
 // identity. It also signs and encrypts it (if necessary) yielding an object
 // that only needs proof-of-work to be done on it.
-func GeneratePubKey(privID *identity.Private, expiry time.Duration) (*wire.MsgPubKey, error) {
+func GeneratePubKey(privID *identity.Private, expiry time.Duration) (*obj.PubKey, error) {
 	addr := &privID.Address
-	if addr.Version < wire.SimplePubKeyVersion ||
-		addr.Version > wire.EncryptedPubKeyVersion {
+	if addr.Version < obj.SimplePubKeyVersion ||
+		addr.Version > obj.EncryptedPubKeyVersion {
 		return nil, ErrUnsupportedOp
 	}
 	var signingKey, encKey wire.PubKey
@@ -47,10 +48,10 @@ func GeneratePubKey(privID *identity.Private, expiry time.Duration) (*wire.MsgPu
 	var tag wire.ShaHash
 	copy(tag[:], addr.Tag())
 
-	msg := wire.NewMsgPubKey(0, time.Now().Add(expiry), addr.Version,
+	msg := obj.NewPubKey(0, time.Now().Add(expiry), addr.Version,
 		addr.Stream, privID.Behavior, &signingKey, &encKey,
 		privID.NonceTrialsPerByte, privID.ExtraBytes, nil, &tag, nil)
-	if addr.Version == wire.SimplePubKeyVersion { // We're done.
+	if addr.Version == obj.SimplePubKeyVersion { // We're done.
 		return msg, nil
 	}
 
@@ -58,14 +59,14 @@ func GeneratePubKey(privID *identity.Private, expiry time.Duration) (*wire.MsgPu
 	return msg, SignAndEncryptPubKey(msg, privID)
 }
 
-// SignAndEncryptPubKey signs and encrypts a MsgPubKey message, populating the
+// SignAndEncryptPubKey signs and encrypts a PubKey message, populating the
 // Signature and Encrypted fields using the provided private identity.
 //
 // The private identity supplied should be of the sender. There are no checks
 // against supplying invalid private identity.
-func SignAndEncryptPubKey(msg *wire.MsgPubKey, privID *identity.Private) error {
-	if msg.Version < wire.ExtendedPubKeyVersion ||
-		msg.Version > wire.EncryptedPubKeyVersion {
+func SignAndEncryptPubKey(msg *obj.PubKey, privID *identity.Private) error {
+	if msg.Version < obj.ExtendedPubKeyVersion ||
+		msg.Version > obj.EncryptedPubKeyVersion {
 		return ErrUnsupportedOp
 	}
 	// Start signing
@@ -87,7 +88,7 @@ func SignAndEncryptPubKey(msg *wire.MsgPubKey, privID *identity.Private) error {
 	msg.Signature = sig.Serialize()
 
 	// Start encryption
-	if msg.Version != wire.EncryptedPubKeyVersion {
+	if msg.Version != obj.EncryptedPubKeyVersion {
 		return nil // Current version doesn't support encryption. We're done!
 	}
 
@@ -106,19 +107,19 @@ func SignAndEncryptPubKey(msg *wire.MsgPubKey, privID *identity.Private) error {
 	return nil
 }
 
-// SignAndEncryptBroadcast signs and encrypts a MsgBroadcast message, populating
+// SignAndEncryptBroadcast signs and encrypts a Broadcast, populating
 // the Signature and Encrypted fields using the provided private identity.
 //
 // The private identity supplied should be of the sender. There are no checks
 // against supplying invalid private identity.
-func SignAndEncryptBroadcast(msg *wire.MsgBroadcast, privID *identity.Private) error {
+func SignAndEncryptBroadcast(msg *obj.Broadcast, privID *identity.Private) error {
 	switch msg.Version {
-	case wire.TaglessBroadcastVersion:
+	case obj.TaglessBroadcastVersion:
 		if msg.FromAddressVersion != 2 && msg.FromAddressVersion != 3 {
 			// only v2/v3 addresses allowed for tagless broadcast
 			return ErrUnsupportedOp
 		}
-	case wire.TagBroadcastVersion:
+	case obj.TagBroadcastVersion:
 		if msg.FromAddressVersion != 4 {
 			// only v4 addresses support tags
 			return ErrUnsupportedOp
@@ -153,11 +154,11 @@ func SignAndEncryptBroadcast(msg *wire.MsgBroadcast, privID *identity.Private) e
 
 	// Encrypt
 	switch msg.Version {
-	case wire.TaglessBroadcastVersion:
+	case obj.TaglessBroadcastVersion:
 		msg.Encrypted, err = btcec.Encrypt(privID.Address.PrivateKeySingleHash().PubKey(),
 			b.Bytes())
 
-	case wire.TagBroadcastVersion:
+	case obj.TagBroadcastVersion:
 		msg.Encrypted, err = btcec.Encrypt(privID.Address.PrivateKey().PubKey(),
 			b.Bytes())
 	}
@@ -169,13 +170,13 @@ func SignAndEncryptBroadcast(msg *wire.MsgBroadcast, privID *identity.Private) e
 	return nil
 }
 
-// SignAndEncryptMsg signs and encrypts a MsgMsg message, populating the
+// SignAndEncryptMsg signs and encrypts a obj.Message, populating the
 // Signature and Encrypted fields using the provided private identity.
 //
 // The private identity supplied should be of the sender. The public identity
 // should be that of the recipient. There are no checks against supplying
 // invalid private or public identities.
-func SignAndEncryptMsg(msg *wire.MsgMsg, privID *identity.Private,
+func SignAndEncryptMsg(msg *obj.Message, privID *identity.Private,
 	pubID *identity.Public) error {
 	if msg.Version != 1 {
 		return ErrUnsupportedOp
@@ -214,20 +215,21 @@ func SignAndEncryptMsg(msg *wire.MsgMsg, privID *identity.Private,
 	return nil
 }
 
-// TryDecryptAndVerifyPubKey tries to decrypt a wire.MsgPubKey of the address.
+// TryDecryptAndVerifyPubKey tries to decrypt a obj.PubKey of the address.
 // If it fails, it returns ErrInvalidIdentity. If decryption succeeds, it
 // verifies the embedded signature. If signature verification fails, it returns
 // ErrInvalidSignature. Else, it returns nil.
 //
-// All necessary fields of the provided wire.MsgPubKey are populated.
-func TryDecryptAndVerifyPubKey(msg *wire.MsgPubKey, address *bmutil.Address) error {
-	if msg.Version < wire.ExtendedPubKeyVersion ||
-		msg.Version > wire.EncryptedPubKeyVersion {
+// All necessary fields of the provided obj.PubKeyObject are populated.
+func TryDecryptAndVerifyPubKey(msg *obj.PubKey, address *bmutil.Address) error {
+	version := msg.ObjectHeader.Version
+	if version < obj.ExtendedPubKeyVersion ||
+		version > obj.EncryptedPubKeyVersion {
 		return ErrUnsupportedOp
 	}
 
 	// Try decryption if msg.Version == wire.EncryptedPubKeyVersion
-	if msg.Version == wire.EncryptedPubKeyVersion {
+	if version == obj.EncryptedPubKeyVersion {
 		// Check tag, save decryption cost.
 		if subtle.ConstantTimeCompare(msg.Tag[:], address.Tag()) != 1 {
 			return ErrInvalidIdentity
@@ -257,7 +259,7 @@ func TryDecryptAndVerifyPubKey(msg *wire.MsgPubKey, address *bmutil.Address) err
 	}
 
 	// Check if embedded keys correspond to the address used for decryption.
-	if msg.Version == wire.EncryptedPubKeyVersion {
+	if msg.Version == obj.EncryptedPubKeyVersion {
 		id := identity.NewPublic(signKey, encKey, msg.NonceTrials,
 			msg.ExtraBytes, msg.Version, msg.StreamNumber)
 
@@ -296,20 +298,20 @@ func TryDecryptAndVerifyPubKey(msg *wire.MsgPubKey, address *bmutil.Address) err
 	return nil
 }
 
-// TryDecryptAndVerifyBroadcast tries to decrypt a wire.MsgBroadcast of the
+// TryDecryptAndVerifyBroadcast tries to decrypt a wire.BroadcastObject of the
 // public identity. If it fails, it returns ErrInvalidIdentity. If decryption
 // succeeds, it verifies the embedded signature. If signature verification
 // fails, it returns ErrInvalidSignature. Else, it returns nil.
 //
-// All necessary fields of the provided wire.MsgBroadcast are populated.
-func TryDecryptAndVerifyBroadcast(msg *wire.MsgBroadcast, address *bmutil.Address) error {
+// All necessary fields of the provided obj.Broadcast are populated.
+func TryDecryptAndVerifyBroadcast(msg *obj.Broadcast, address *bmutil.Address) error {
 	var dec []byte
 	var err error
 
 	switch msg.Version {
-	case wire.TaglessBroadcastVersion:
+	case obj.TaglessBroadcastVersion:
 		dec, err = btcec.Decrypt(address.PrivateKeySingleHash(), msg.Encrypted)
-	case wire.TagBroadcastVersion:
+	case obj.TagBroadcastVersion:
 		if subtle.ConstantTimeCompare(msg.Tag[:], address.Tag()) != 1 {
 			return ErrInvalidIdentity
 		}
@@ -374,13 +376,13 @@ func TryDecryptAndVerifyBroadcast(msg *wire.MsgBroadcast, address *bmutil.Addres
 	return nil
 }
 
-// TryDecryptAndVerifyMsg tries to decrypt a wire.MsgMsg using the private
+// TryDecryptAndVerifyMsg tries to decrypt an obj.Message using the private
 // identity. If it fails, it returns ErrInvalidIdentity. If decryption succeeds,
 // it verifies the embedded signature. If signature verification fails, it
 // returns ErrInvalidSignature. Else, it returns nil.
 //
-// All necessary fields of the provided wire.MsgMsg are populated.
-func TryDecryptAndVerifyMsg(msg *wire.MsgMsg, privID *identity.Private) error {
+// All necessary fields of the provided wire.Message are populated.
+func TryDecryptAndVerifyMsg(msg *obj.Message, privID *identity.Private) error {
 	if msg.Version != 1 {
 		return ErrUnsupportedOp
 	}

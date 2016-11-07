@@ -3,15 +3,17 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire
+package obj
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"time"
 
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/wire"
 )
 
 const (
@@ -24,22 +26,18 @@ const (
 	TagBroadcastVersion = 5
 )
 
-// MsgBroadcast implements the Message interface and represents a broadcast
+// Broadcast implements the Object interface and represents a broadcast
 // message that can be decrypted by all the clients that know the address of the
 // sender.
-type MsgBroadcast struct {
-	Nonce              uint64
-	ExpiresTime        time.Time
-	ObjectType         ObjectType
-	Version            uint64
-	StreamNumber       uint64
-	Tag                *ShaHash
+type Broadcast struct {
+	wire.ObjectHeader
+	Tag                *wire.ShaHash
 	Encrypted          []byte
 	FromAddressVersion uint64
 	FromStreamNumber   uint64
 	Behavior           uint32
-	SigningKey         *PubKey
-	EncryptionKey      *PubKey
+	SigningKey         *wire.PubKey
+	EncryptionKey      *wire.PubKey
 	NonceTrials        uint64
 	ExtraBytes         uint64
 	Encoding           uint64
@@ -49,23 +47,22 @@ type MsgBroadcast struct {
 
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgBroadcast) Decode(r io.Reader) error {
+func (msg *Broadcast) Decode(r io.Reader) error {
 	var err error
-	msg.Nonce, msg.ExpiresTime, msg.ObjectType, msg.Version,
-		msg.StreamNumber, err = DecodeMsgObjectHeader(r)
+	msg.ObjectHeader, err = wire.DecodeMsgObjectHeader(r)
 	if err != nil {
 		return err
 	}
 
-	if msg.ObjectType != ObjectTypeBroadcast {
+	if msg.ObjectType != wire.ObjectTypeBroadcast {
 		str := fmt.Sprintf("Object Type should be %d, but is %d",
-			ObjectTypeBroadcast, msg.ObjectType)
-		return messageError("Decode", str)
+			wire.ObjectTypeBroadcast, msg.ObjectType)
+		return wire.NewMessageError("Decode", str)
 	}
 
 	if msg.Version == TagBroadcastVersion {
-		msg.Tag = &ShaHash{}
-		if err = readElements(r, msg.Tag); err != nil {
+		msg.Tag = &wire.ShaHash{}
+		if err = wire.ReadElements(r, msg.Tag); err != nil {
 			return err
 		}
 	}
@@ -75,17 +72,9 @@ func (msg *MsgBroadcast) Decode(r io.Reader) error {
 	return err
 }
 
-// Encode encodes the receiver to w using the bitmessage protocol encoding.
-// This is part of the Message interface implementation.
-func (msg *MsgBroadcast) Encode(w io.Writer) error {
-	err := EncodeMsgObjectHeader(w, msg.Nonce, msg.ExpiresTime, msg.ObjectType,
-		msg.Version, msg.StreamNumber)
-	if err != nil {
-		return err
-	}
-
+func (msg *Broadcast) encodePayload(w io.Writer) (err error) {
 	if msg.Version == TagBroadcastVersion {
-		if err = writeElement(w, msg.Tag); err != nil {
+		if err = wire.WriteElement(w, msg.Tag); err != nil {
 			return err
 		}
 	}
@@ -94,31 +83,35 @@ func (msg *MsgBroadcast) Encode(w io.Writer) error {
 	return err
 }
 
-// Command returns the protocol command string for the message. This is part
-// of the Message interface implementation.
-func (msg *MsgBroadcast) Command() string {
-	return CmdObject
+// Encode encodes the receiver to w using the bitmessage protocol encoding.
+// This is part of the Message interface implementation.
+func (msg *Broadcast) Encode(w io.Writer) error {
+	err := msg.ObjectHeader.Encode(w)
+	if err != nil {
+		return err
+	}
+
+	return msg.encodePayload(w)
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver. This is part of the Message interface implementation.
-func (msg *MsgBroadcast) MaxPayloadLength() int {
-	return MaxPayloadOfMsgObject
+func (msg *Broadcast) MaxPayloadLength() int {
+	return wire.MaxPayloadOfMsgObject
 }
 
-func (msg *MsgBroadcast) String() string {
+func (msg *Broadcast) String() string {
 	return fmt.Sprintf("broadcast: v%d %d %s %d %x %x", msg.Version, msg.Nonce, msg.ExpiresTime, msg.StreamNumber, msg.Tag, msg.Encrypted)
 }
 
-// EncodeForSigning encodes MsgBroadcast so that it can be hashed and signed.
-func (msg *MsgBroadcast) EncodeForSigning(w io.Writer) error {
-	err := EncodeMsgObjectSignatureHeader(w, msg.ExpiresTime, msg.ObjectType,
-		msg.Version, msg.StreamNumber)
+// EncodeForSigning encodes Broadcast so that it can be hashed and signed.
+func (msg *Broadcast) EncodeForSigning(w io.Writer) error {
+	err := msg.ObjectHeader.EncodeForSigning(w)
 	if err != nil {
 		return err
 	}
 	if msg.Version == TagBroadcastVersion {
-		err = writeElement(w, msg.Tag)
+		err = wire.WriteElement(w, msg.Tag)
 		if err != nil {
 			return err
 		}
@@ -129,7 +122,7 @@ func (msg *MsgBroadcast) EncodeForSigning(w io.Writer) error {
 	if err = bmutil.WriteVarInt(w, msg.FromStreamNumber); err != nil {
 		return err
 	}
-	err = writeElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+	err = wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
 	if err != nil {
 		return err
 	}
@@ -154,15 +147,15 @@ func (msg *MsgBroadcast) EncodeForSigning(w io.Writer) error {
 	return nil
 }
 
-// EncodeForEncryption encodes MsgBroadcast so that it can be encrypted.
-func (msg *MsgBroadcast) EncodeForEncryption(w io.Writer) error {
+// EncodeForEncryption encodes Broadcast so that it can be encrypted.
+func (msg *Broadcast) EncodeForEncryption(w io.Writer) error {
 	if err := bmutil.WriteVarInt(w, msg.FromAddressVersion); err != nil {
 		return err
 	}
 	if err := bmutil.WriteVarInt(w, msg.FromStreamNumber); err != nil {
 		return err
 	}
-	err := writeElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+	err := wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
 	if err != nil {
 		return err
 	}
@@ -194,8 +187,8 @@ func (msg *MsgBroadcast) EncodeForEncryption(w io.Writer) error {
 	return nil
 }
 
-// DecodeFromDecrypted decodes MsgBroadcast from its decrypted form.
-func (msg *MsgBroadcast) DecodeFromDecrypted(r io.Reader) error {
+// DecodeFromDecrypted decodes Broadcast from its decrypted form.
+func (msg *Broadcast) DecodeFromDecrypted(r io.Reader) error {
 	var err error
 	if msg.FromAddressVersion, err = bmutil.ReadVarInt(r); err != nil {
 		return err
@@ -203,9 +196,9 @@ func (msg *MsgBroadcast) DecodeFromDecrypted(r io.Reader) error {
 	if msg.FromStreamNumber, err = bmutil.ReadVarInt(r); err != nil {
 		return err
 	}
-	msg.SigningKey = &PubKey{}
-	msg.EncryptionKey = &PubKey{}
-	err = readElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+	msg.SigningKey = &wire.PubKey{}
+	msg.EncryptionKey = &wire.PubKey{}
+	err = wire.ReadElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
 	if err != nil {
 		return err
 	}
@@ -224,11 +217,11 @@ func (msg *MsgBroadcast) DecodeFromDecrypted(r io.Reader) error {
 	if msgLength, err = bmutil.ReadVarInt(r); err != nil {
 		return err
 	}
-	if msgLength > MaxPayloadOfMsgObject {
+	if msgLength > wire.MaxPayloadOfMsgObject {
 		str := fmt.Sprintf("message length exceeds max length - "+
 			"indicates %d, but max length is %d",
-			msgLength, MaxPayloadOfMsgObject)
-		return messageError("DecodeFromDecrypted", str)
+			msgLength, wire.MaxPayloadOfMsgObject)
+		return wire.NewMessageError("DecodeFromDecrypted", str)
 	}
 	msg.Message = make([]byte, msgLength)
 	_, err = io.ReadFull(r, msg.Message)
@@ -243,23 +236,51 @@ func (msg *MsgBroadcast) DecodeFromDecrypted(r io.Reader) error {
 		str := fmt.Sprintf("signature length exceeds max length - "+
 			"indicates %d, but max length is %d",
 			sigLength, signatureMaxLength)
-		return messageError("DecodeFromDecrypted", str)
+		return wire.NewMessageError("DecodeFromDecrypted", str)
 	}
 	msg.Signature = make([]byte, sigLength)
 	_, err = io.ReadFull(r, msg.Signature)
 	return err
 }
 
-// NewMsgBroadcast returns a new object message that conforms to the
-// Message interface using the passed parameters and defaults for the remaining
+// Header returns the object header.
+func (msg *Broadcast) Header() *wire.ObjectHeader {
+	return &msg.ObjectHeader
+}
+
+// ObjectPayload return the object payload of the message.
+func (msg *Broadcast) Payload() []byte {
+	w := &bytes.Buffer{}
+	msg.encodePayload(w)
+	return w.Bytes()
+}
+
+// MsgObject transforms the PubKeyObject to a *MsgObject.
+func (msg *Broadcast) MsgObject() *wire.MsgObject {
+	return wire.NewMsgObject(msg.ObjectHeader.Nonce,
+		msg.ObjectHeader.ExpiresTime, msg.ObjectHeader.ObjectType,
+		msg.ObjectHeader.Version, msg.ObjectHeader.StreamNumber, msg.Payload())
+}
+
+func (msg *Broadcast) InventoryHash() *wire.ShaHash {
+	return msg.MsgObject().InventoryHash()
+}
+
+// NewBroadcast returns a new object message that conforms to the
+// Object interface using the passed parameters and defaults for the remaining
 // fields.
-func NewMsgBroadcast(nonce uint64, expires time.Time, version, streamNumber uint64, tag *ShaHash, encrypted []byte, fromAddressVersion, fromStreamNumber uint64, behavior uint32, signingKey, encryptKey *PubKey, nonceTrials, extraBytes, encoding uint64, message, signature []byte) *MsgBroadcast {
-	return &MsgBroadcast{
-		Nonce:              nonce,
-		ExpiresTime:        expires,
-		ObjectType:         ObjectTypeBroadcast,
-		Version:            version,
-		StreamNumber:       streamNumber,
+func NewBroadcast(nonce uint64, expires time.Time, version, streamNumber uint64,
+	tag *wire.ShaHash, encrypted []byte, fromAddressVersion, fromStreamNumber uint64,
+	behavior uint32, signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes,
+	encoding uint64, message, signature []byte) *Broadcast {
+	return &Broadcast{
+		ObjectHeader: wire.ObjectHeader{
+			Nonce:        nonce,
+			ExpiresTime:  expires,
+			ObjectType:   wire.ObjectTypeBroadcast,
+			Version:      version,
+			StreamNumber: streamNumber,
+		},
 		Tag:                tag,
 		Encrypted:          encrypted,
 		FromAddressVersion: fromAddressVersion,

@@ -14,7 +14,7 @@ import (
 // RipeHashSize is the size of array used to store ripe hashes.
 const RipeHashSize = 20
 
-// HashStringSize is the maximum length of a Ripe hash string.
+// RipeHashStringSize is the maximum length of a Ripe hash string.
 const RipeHashStringSize = RipeHashSize * 2
 
 // ErrRipeHashStrSize describes an error that indicates the caller specified

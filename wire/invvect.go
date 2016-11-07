@@ -38,7 +38,7 @@ func NewInvVect(hash *ShaHash) *InvVect {
 // readInvVect reads an encoded InvVect from r depending on the protocol
 // version.
 func readInvVect(r io.Reader, iv *InvVect) error {
-	err := readElements(r, &iv.Hash)
+	err := ReadElements(r, &iv.Hash)
 	if err != nil {
 		return err
 	}
@@ -47,7 +47,7 @@ func readInvVect(r io.Reader, iv *InvVect) error {
 
 // writeInvVect serializes an InvVect to w depending on the protocol version.
 func writeInvVect(w io.Writer, iv *InvVect) error {
-	err := writeElements(w, iv.Hash)
+	err := WriteElements(w, iv.Hash)
 	if err != nil {
 		return err
 	}

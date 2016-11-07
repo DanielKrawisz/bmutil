@@ -40,7 +40,7 @@ func (msg *MsgInv) AddInvVect(iv *InvVect) error {
 	if len(msg.InvList)+1 > MaxInvPerMsg {
 		str := fmt.Sprintf("too many invvect in message [max %v]",
 			MaxInvPerMsg)
-		return messageError("MsgInv.AddInvVect", str)
+		return NewMessageError("MsgInv.AddInvVect", str)
 	}
 
 	msg.InvList = append(msg.InvList, iv)
@@ -58,7 +58,7 @@ func (msg *MsgInv) Decode(r io.Reader) error {
 	// Limit to max inventory vectors per message.
 	if count > MaxInvPerMsg {
 		str := fmt.Sprintf("too many invvect in message [%v]", count)
-		return messageError("MsgInv.Decode", str)
+		return NewMessageError("MsgInv.Decode", str)
 	}
 
 	msg.InvList = make([]*InvVect, 0, count)
@@ -81,7 +81,7 @@ func (msg *MsgInv) Encode(w io.Writer) error {
 	count := len(msg.InvList)
 	if count > MaxInvPerMsg {
 		str := fmt.Sprintf("too many invvect in message [%v]", count)
-		return messageError("MsgInv.Encode", str)
+		return NewMessageError("MsgInv.Encode", str)
 	}
 
 	err := bmutil.WriteVarInt(w, uint64(count))

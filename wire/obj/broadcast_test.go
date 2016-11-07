@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package obj_test
 
 import (
 	"bytes"
@@ -12,22 +12,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/wire/fixed"
+	"github.com/DanielKrawisz/bmutil/wire/obj"
+	"github.com/davecgh/go-spew/spew"
 )
 
-// TestBroadcast tests the MsgBroadcast API.
+// TestBroadcast tests the Broadcast API.
 func TestBroadcast(t *testing.T) {
 
 	// Ensure the command is expected value.
-	wantCmd := "object"
 	now := time.Now()
 	enc := make([]byte, 99)
-	msg := wire.NewMsgBroadcast(83928, now, 2, 1, nil, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
-	if cmd := msg.Command(); cmd != wantCmd {
-		t.Errorf("NewMsgBroadcast: wrong command - got %v want %v",
-			cmd, wantCmd)
-	}
+	msg := obj.NewBroadcast(83928, now, 2, 1, nil, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
 
 	// Ensure max payload is expected value for latest protocol version.
 	wantPayload := wire.MaxPayloadOfMsgObject
@@ -45,12 +42,12 @@ func TestBroadcast(t *testing.T) {
 	return
 }
 
-// TestBroadcastWire tests the MsgBroadcast wire.encode and decode for
+// TestBroadcastWire tests the Broadcast wire.encode and decode for
 // various versions.
 func TestBroadcastWire(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	enc := make([]byte, 128)
-	msgBase := wire.NewMsgBroadcast(83928, expires, 2, 1, nil, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
+	msgBase := obj.NewBroadcast(83928, expires, 2, 1, nil, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
 
 	m := make([]byte, 32)
 	a := make([]byte, 8)
@@ -59,13 +56,13 @@ func TestBroadcastWire(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not make a sha hash %s", err)
 	}
-	msgTagged := wire.NewMsgBroadcast(83928, expires, 5, 1, tag, enc, 1, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
-	msgBaseAndTag := wire.NewMsgBroadcast(83928, expires, 5, 1, tag, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
+	msgTagged := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 1, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
+	msgBaseAndTag := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
 
 	tests := []struct {
-		in  *wire.MsgBroadcast // Message to encode
-		out *wire.MsgBroadcast // Expected decoded message
-		buf []byte             // Wire encoding
+		in  *obj.Broadcast // Message to encode
+		out *obj.Broadcast // Expected decoded message
+		buf []byte         // Wire encoding
 	}{
 		// Latest protocol version with multiple object vectors.
 		{
@@ -96,7 +93,7 @@ func TestBroadcastWire(t *testing.T) {
 		}
 
 		// Decode the message from wire.format.
-		var msg wire.MsgBroadcast
+		var msg obj.Broadcast
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.Decode(rbuf)
 		if err != nil {
@@ -111,7 +108,7 @@ func TestBroadcastWire(t *testing.T) {
 	}
 }
 
-// TestBroadcastWireError tests the MsgBroadcast error paths
+// TestBroadcastWireError tests the Broadcast error paths
 func TestBroadcastWireError(t *testing.T) {
 	wireErr := &wire.MessageError{}
 
@@ -120,11 +117,11 @@ func TestBroadcastWireError(t *testing.T) {
 	wrongObjectTypeEncoded[19] = 0
 
 	tests := []struct {
-		in       *wire.MsgBroadcast // Value to encode
-		buf      []byte             // Wire encoding
-		max      int                // Max size of fixed buffer to induce errors
-		writeErr error              // Expected write error
-		readErr  error              // Expected read error
+		in       *obj.Broadcast // Value to encode
+		buf      []byte         // Wire encoding
+		max      int            // Max size of fixed buffer to induce errors
+		writeErr error          // Expected write error
+		readErr  error          // Expected read error
 	}{
 		// Force error in nonce
 		{baseBroadcast, baseBroadcastEncoded, 0, io.ErrShortWrite, io.EOF},
@@ -145,7 +142,7 @@ func TestBroadcastWireError(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire.format.
-		w := newFixedWriter(test.max)
+		w := fixed.NewWriter(test.max)
 		err := test.in.Encode(w)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
 			t.Errorf("Encode #%d wrong error got: %v, want: %v",
@@ -164,7 +161,7 @@ func TestBroadcastWireError(t *testing.T) {
 		}
 
 		// Decode from wire.format.
-		var msg wire.MsgBroadcast
+		var msg obj.Broadcast
 		buf := bytes.NewBuffer(test.buf[0:test.max])
 		err = msg.Decode(buf)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
@@ -185,7 +182,7 @@ func TestBroadcastWireError(t *testing.T) {
 	}
 }
 
-// TestBroadcastEnrcypt tests the MsgBroadcast wire.EncodeForEncryption and
+// TestBroadcastEnrcypt tests the Broadcast wire.EncodeForEncryption and
 // DecodeForEncryption for various versions.
 func TestBroadcastEncrypt(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
@@ -198,12 +195,12 @@ func TestBroadcastEncrypt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not make a sha hash %s", err)
 	}
-	msgTagged := wire.NewMsgBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
+	msgTagged := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
 
 	tests := []struct {
-		in  *wire.MsgBroadcast // Message to encode
-		out *wire.MsgBroadcast // Expected decoded message
-		buf []byte             // Wire encoding
+		in  *obj.Broadcast // Message to encode
+		out *obj.Broadcast // Expected decoded message
+		buf []byte         // Wire encoding
 	}{
 		// Latest protocol version with multiple object vectors.
 		{
@@ -229,7 +226,7 @@ func TestBroadcastEncrypt(t *testing.T) {
 		}
 
 		// Decode the message from wire.format.
-		var msg wire.MsgBroadcast
+		var msg obj.Broadcast
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.DecodeFromDecrypted(rbuf)
 		if err != nil {
@@ -254,7 +251,7 @@ func TestBroadcastEncrypt(t *testing.T) {
 	}
 }
 
-// TestBroadcastEncryptError tests the MsgBroadcast error paths
+// TestBroadcastEncryptError tests the Broadcast error paths
 func TestBroadcastEncryptError(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	enc := make([]byte, 128)
@@ -266,12 +263,12 @@ func TestBroadcastEncryptError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not make a sha hash %s", err)
 	}
-	msgTagged := wire.NewMsgBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
+	msgTagged := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
 
 	tests := []struct {
-		in  *wire.MsgBroadcast // Value to encode
-		buf []byte             // Wire encoding
-		max int                // Max size of fixed buffer to induce errors
+		in  *obj.Broadcast // Value to encode
+		buf []byte         // Wire encoding
+		max int            // Max size of fixed buffer to induce errors
 	}{
 		// Force error in FromAddressVersion
 		{msgTagged, broadcastEncodedForEncryption, 0},
@@ -298,7 +295,7 @@ func TestBroadcastEncryptError(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// EncodeForEncryption.
-		w := newFixedWriter(test.max)
+		w := fixed.NewWriter(test.max)
 		err := test.in.EncodeForEncryption(w)
 		if err == nil {
 			t.Errorf("EncodeForEncryption #%d no error returned", i)
@@ -306,7 +303,7 @@ func TestBroadcastEncryptError(t *testing.T) {
 		}
 
 		// DecodeFromDecrypted.
-		var msg wire.MsgBroadcast
+		var msg obj.Broadcast
 		buf := bytes.NewBuffer(test.buf[0:test.max])
 		err = msg.DecodeFromDecrypted(buf)
 		if err == nil {
@@ -316,7 +313,7 @@ func TestBroadcastEncryptError(t *testing.T) {
 	}
 
 	// Try to decode too long a message.
-	var msg wire.MsgBroadcast
+	var msg obj.Broadcast
 	broadcastEncodedForEncryption[141] = 0xff
 	broadcastEncodedForEncryption[142] = 200
 	broadcastEncodedForEncryption[143] = 200
@@ -343,7 +340,7 @@ func TestBroadcastEncryptError(t *testing.T) {
 	broadcastEncodedForEncryption[176] = 0
 }
 
-// TestBroadcastEnrcypt tests the MsgBroadcast wire.EncodeForEncryption and
+// TestBroadcastEnrcypt tests the Broadcast wire.EncodeForEncryption and
 // DecodeForEncryption for various versions.
 func TestBroadcastEncodeForSigning(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
@@ -356,11 +353,11 @@ func TestBroadcastEncodeForSigning(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not make a sha hash %s", err)
 	}
-	msgTagged := wire.NewMsgBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
+	msgTagged := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
 
 	tests := []struct {
-		in  *wire.MsgBroadcast // Message to encode
-		buf []byte             // Wire encoding
+		in  *obj.Broadcast // Message to encode
+		buf []byte         // Wire encoding
 	}{
 		// Latest protocol version with multiple object vectors.
 		{
@@ -386,7 +383,7 @@ func TestBroadcastEncodeForSigning(t *testing.T) {
 	}
 }
 
-// TestBroadcastEncryptError tests the MsgBroadcast error paths
+// TestBroadcastEncryptError tests the Broadcast error paths
 func TestBroadcastEncodeForSigningError(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	enc := make([]byte, 128)
@@ -398,11 +395,11 @@ func TestBroadcastEncodeForSigningError(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not make a sha hash %s", err)
 	}
-	msgTagged := wire.NewMsgBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
+	msgTagged := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
 
 	tests := []struct {
-		in  *wire.MsgBroadcast // Value to encode
-		max int                // Max size of fixed buffer to induce errors
+		in  *obj.Broadcast // Value to encode
+		max int            // Max size of fixed buffer to induce errors
 	}{
 		// Force error in Tag
 		{msgTagged, -40},
@@ -429,7 +426,7 @@ func TestBroadcastEncodeForSigningError(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// EncodeForEncryption.
-		w := newFixedWriter(test.max + 46)
+		w := fixed.NewWriter(test.max + 46)
 		err := test.in.EncodeForSigning(w)
 		if err == nil {
 			t.Errorf("EncodeForSigning #%d no error returned", i)
@@ -438,13 +435,15 @@ func TestBroadcastEncodeForSigningError(t *testing.T) {
 	}
 }
 
-// baseBroadcast is used in the various tests as a baseline MsgBroadcast.
-var baseBroadcast = &wire.MsgBroadcast{
-	Nonce:        123123,                   // 0x1e0f3
-	ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-	ObjectType:   wire.ObjectTypeBroadcast,
-	Version:      2,
-	StreamNumber: 1,
+// baseBroadcast is used in the various tests as a baseline Broadcast.
+var baseBroadcast = &obj.Broadcast{
+	ObjectHeader: wire.ObjectHeader{
+		Nonce:        123123,                   // 0x1e0f3
+		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+		ObjectType:   wire.ObjectTypeBroadcast,
+		Version:      2,
+		StreamNumber: 1,
+	},
 	Encrypted: []byte{
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -458,12 +457,14 @@ var baseBroadcast = &wire.MsgBroadcast{
 }
 
 // baseBroadcast is a broadcast from a v4 address (includes a tag).
-var taggedBroadcast = &wire.MsgBroadcast{
-	Nonce:        123123,                   // 0x1e0f3
-	ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-	ObjectType:   wire.ObjectTypeBroadcast,
-	Version:      5,
-	StreamNumber: 1,
+var taggedBroadcast = &obj.Broadcast{
+	ObjectHeader: wire.ObjectHeader{
+		Nonce:        123123,                   // 0x1e0f3
+		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+		ObjectType:   wire.ObjectTypeBroadcast,
+		Version:      5,
+		StreamNumber: 1,
+	},
 	Tag: &wire.ShaHash{
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

@@ -15,9 +15,9 @@ import (
 	"time"
 )
 
-// readElement reads the next sequence of bytes from r using big endian
+// ReadElement reads the next sequence of bytes from r using big endian
 // depending on the concrete type of element pointed to.
-func readElement(r io.Reader, element interface{}) error {
+func ReadElement(r io.Reader, element interface{}) error {
 	var scratch [8]byte
 
 	// Attempt to read the element based on the concrete type via fast
@@ -160,11 +160,11 @@ func readElement(r io.Reader, element interface{}) error {
 	return binary.Read(r, binary.BigEndian, element)
 }
 
-// readElements reads multiple items from r.  It is equivalent to multiple
+// ReadElements reads multiple items from r.  It is equivalent to multiple
 // calls to readElement.
-func readElements(r io.Reader, elements ...interface{}) error {
+func ReadElements(r io.Reader, elements ...interface{}) error {
 	for _, element := range elements {
-		err := readElement(r, element)
+		err := ReadElement(r, element)
 		if err != nil {
 			return err
 		}
@@ -172,8 +172,8 @@ func readElements(r io.Reader, elements ...interface{}) error {
 	return nil
 }
 
-// writeElement writes the big endian representation of element to w.
-func writeElement(w io.Writer, element interface{}) error {
+// WriteElement writes the big endian representation of element to w.
+func WriteElement(w io.Writer, element interface{}) error {
 	var scratch [8]byte
 
 	// Attempt to write the element based on the concrete type via fast
@@ -316,11 +316,11 @@ func writeElement(w io.Writer, element interface{}) error {
 	return binary.Write(w, binary.BigEndian, element)
 }
 
-// writeElements writes multiple items to w.  It is equivalent to multiple
+// WriteElements writes multiple items to w.  It is equivalent to multiple
 // calls to writeElement.
-func writeElements(w io.Writer, elements ...interface{}) error {
+func WriteElements(w io.Writer, elements ...interface{}) error {
 	for _, element := range elements {
-		err := writeElement(w, element)
+		err := WriteElement(w, element)
 		if err != nil {
 			return err
 		}

@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package obj_test
 
 import (
 	"bytes"
@@ -12,21 +12,18 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/wire/fixed"
+	"github.com/DanielKrawisz/bmutil/wire/obj"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // TestPubKey tests the MsgPubKey API.
 func TestPubKey(t *testing.T) {
 
 	// Ensure the command is expected value.
-	wantCmd := "object"
 	now := time.Now()
-	msg := wire.NewMsgPubKey(83928, now, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
-	if cmd := msg.Command(); cmd != wantCmd {
-		t.Errorf("NewMsgPubKey: wrong command - got %v want %v",
-			cmd, wantCmd)
-	}
+	msg := obj.NewPubKey(83928, now, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
 
 	// Ensure max payload is expected value for latest protocol version.
 	wantPayload := wire.MaxPayloadOfMsgObject
@@ -50,20 +47,20 @@ func TestPubKeyWire(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	sig := make([]byte, 64)
 	encrypted := make([]byte, 512)
-	msgBase := wire.NewMsgPubKey(83928, expires, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
-	msgExpanded := wire.NewMsgPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
+	msgBase := obj.NewPubKey(83928, expires, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
+	msgExpanded := obj.NewPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
 	tagBytes := make([]byte, 32)
 	tagBytes[0] = 1
 	tag, err := wire.NewShaHash(tagBytes)
 	if err != nil {
 		t.Fatalf("could not make a tag hash %s", err)
 	}
-	msgEncrypted := wire.NewMsgPubKey(83928, expires, 4, 1, 0, nil, nil, 0, 0, nil, tag, encrypted)
+	msgEncrypted := obj.NewPubKey(83928, expires, 4, 1, 0, nil, nil, 0, 0, nil, tag, encrypted)
 
 	tests := []struct {
-		in  *wire.MsgPubKey // Message to encode
-		out *wire.MsgPubKey // Expected decoded message
-		buf []byte          // Wire encoding
+		in  *obj.PubKey // Message to encode
+		out *obj.PubKey // Expected decoded message
+		buf []byte      // Wire encoding
 	}{
 		// Latest protocol version with multiple object vectors.
 		{
@@ -99,7 +96,7 @@ func TestPubKeyWire(t *testing.T) {
 		}
 
 		// Decode the message from wire.format.
-		var msg wire.MsgPubKey
+		var msg obj.PubKey
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.Decode(rbuf)
 		if err != nil {
@@ -123,11 +120,11 @@ func TestPubKeyWireError(t *testing.T) {
 	wrongObjectTypeEncoded[19] = 0
 
 	tests := []struct {
-		in       *wire.MsgPubKey // Value to encode
-		buf      []byte          // Wire encoding
-		max      int             // Max size of fixed buffer to induce errors
-		writeErr error           // Expected write error
-		readErr  error           // Expected read error
+		in       *obj.PubKey // Value to encode
+		buf      []byte      // Wire encoding
+		max      int         // Max size of fixed buffer to induce errors
+		writeErr error       // Expected write error
+		readErr  error       // Expected read error
 	}{
 		// Force error in nonce
 		{basePubKey, basePubKeyEncoded, 0, io.ErrShortWrite, io.EOF},
@@ -163,7 +160,7 @@ func TestPubKeyWireError(t *testing.T) {
 	for i, test := range tests {
 		//fmt.Printf("%d: %+v\n", i, *test.in)
 		// Encode to wire.format.
-		w := newFixedWriter(test.max)
+		w := fixed.NewWriter(test.max)
 		err := test.in.Encode(w)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
 			t.Errorf("Encode #%d wrong error got: %v, want: %v",
@@ -182,7 +179,7 @@ func TestPubKeyWireError(t *testing.T) {
 		}
 
 		// Decode from wire.format.
-		var msg wire.MsgPubKey
+		var msg obj.PubKey
 		buf := bytes.NewBuffer(test.buf[0:test.max])
 		err = msg.Decode(buf)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
@@ -205,7 +202,7 @@ func TestPubKeyWireError(t *testing.T) {
 	// Test error for binary message with a pubkey that is too long.
 	expandedPubKeyEncoded[156] = 90
 	buf := bytes.NewBuffer(expandedPubKeyEncoded)
-	var msg wire.MsgPubKey
+	var msg obj.PubKey
 	err := msg.Decode(buf)
 	if reflect.TypeOf(err) != reflect.TypeOf(&wire.MessageError{Func: "", Description: ""}) {
 		t.Errorf("%s", err.Error())
@@ -219,13 +216,13 @@ func TestPubKeyWireError(t *testing.T) {
 func TestPubKeyEncryption(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	sig := make([]byte, 64)
-	msgBase := wire.NewMsgPubKey(83928, expires, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
-	msgExpanded := wire.NewMsgPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
+	msgBase := obj.NewPubKey(83928, expires, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
+	msgExpanded := obj.NewPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
 
 	tests := []struct {
-		in  *wire.MsgPubKey // Message to encode
-		out *wire.MsgPubKey // Expected decoded message
-		buf []byte          // Wire encoding
+		in  *obj.PubKey // Message to encode
+		out *obj.PubKey // Expected decoded message
+		buf []byte      // Wire encoding
 	}{
 		// Latest protocol version with multiple object vectors.
 		{
@@ -256,7 +253,7 @@ func TestPubKeyEncryption(t *testing.T) {
 		}
 
 		// Decode the message from wire.format.
-		var msg wire.MsgPubKey
+		var msg obj.PubKey
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.DecodeFromDecrypted(rbuf)
 		if err != nil {
@@ -289,12 +286,12 @@ func TestPubKeyEncryption(t *testing.T) {
 func TestPubKeyEncryptError(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	sig := make([]byte, 64)
-	msgExpanded := wire.NewMsgPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
+	msgExpanded := obj.NewPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
 
 	tests := []struct {
-		in  *wire.MsgPubKey // Value to encode
-		buf []byte          // Wire encoding
-		max int             // Max size of fixed buffer to induce errors
+		in  *obj.PubKey // Value to encode
+		buf []byte      // Wire encoding
+		max int         // Max size of fixed buffer to induce errors
 	}{
 		// Force error in behavior
 		{msgExpanded, encodedForEncryption2, 0},
@@ -312,7 +309,7 @@ func TestPubKeyEncryptError(t *testing.T) {
 	for i, test := range tests {
 
 		// Encode to wire.format.
-		w := newFixedWriter(test.max)
+		w := fixed.NewWriter(test.max)
 		err := test.in.EncodeForEncryption(w)
 		if err == nil {
 			t.Errorf("EncodeForSigning #%d should have returned an error", i)
@@ -320,7 +317,7 @@ func TestPubKeyEncryptError(t *testing.T) {
 		}
 
 		// Decode from wire.format.
-		var msg wire.MsgPubKey
+		var msg obj.PubKey
 		buf := bytes.NewBuffer(test.buf[0:test.max])
 		err = msg.DecodeFromDecrypted(buf)
 		if err == nil {
@@ -330,7 +327,7 @@ func TestPubKeyEncryptError(t *testing.T) {
 	}
 
 	// Try to decode a message with too long a signature length.
-	var msg wire.MsgPubKey
+	var msg obj.PubKey
 	encodedForEncryption2[134] = 100
 	buf := bytes.NewBuffer(encodedForEncryption2)
 	err := msg.DecodeFromDecrypted(buf)
@@ -344,12 +341,12 @@ func TestPubKeyEncryptError(t *testing.T) {
 func TestEncodeForSigning(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	sig := make([]byte, 64)
-	msgBase := wire.NewMsgPubKey(83928, expires, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
-	msgExpanded := wire.NewMsgPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
+	msgBase := obj.NewPubKey(83928, expires, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
+	msgExpanded := obj.NewPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
 
 	tests := []struct {
-		in  *wire.MsgPubKey // Message to encode
-		buf []byte          // Wire encoding
+		in  *obj.PubKey // Message to encode
+		buf []byte      // Wire encoding
 	}{
 		// Latest protocol version with multiple object vectors.
 		{
@@ -383,13 +380,13 @@ func TestEncodeForSigning(t *testing.T) {
 func TestEncodeForSigningError(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	sig := make([]byte, 64)
-	msgExpanded := wire.NewMsgPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
-	msgExpandedEncrypted := wire.NewMsgPubKey(83928, expires, 4, 1, 0, pubKey1, pubKey2, 0, 0, sig,
+	msgExpanded := obj.NewPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
+	msgExpandedEncrypted := obj.NewPubKey(83928, expires, 4, 1, 0, pubKey1, pubKey2, 0, 0, sig,
 		tag, nil)
 
 	tests := []struct {
-		in  *wire.MsgPubKey // Value to encode
-		max []int           // Max sizes of fixed buffer to induce errors
+		in  *obj.PubKey // Value to encode
+		max []int       // Max sizes of fixed buffer to induce errors
 	}{
 		{msgExpanded, []int{8, 12, 82, 146, 147}},
 		{msgExpandedEncrypted, []int{8, 14}},
@@ -400,7 +397,7 @@ func TestEncodeForSigningError(t *testing.T) {
 		for j, max := range test.max {
 
 			// Encode to wire.format.
-			w := newFixedWriter(max)
+			w := fixed.NewWriter(max)
 			err := test.in.EncodeForSigning(w)
 			if reflect.TypeOf(err) == nil {
 				t.Errorf("EncodeForSigning #%d, %d should have returned an error", i, j)
@@ -430,23 +427,27 @@ var tag = &wire.ShaHash{
 }
 
 // basePubKey is used in the various tests as a baseline MsgPubKey.
-var basePubKey = &wire.MsgPubKey{
-	Nonce:         123123,                   // 0x1e0f3
-	ExpiresTime:   time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-	ObjectType:    wire.ObjectTypePubKey,
-	Version:       2,
-	StreamNumber:  1,
+var basePubKey = &obj.PubKey{
+	ObjectHeader: wire.ObjectHeader{
+		Nonce:        123123,                   // 0x1e0f3
+		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+		ObjectType:   wire.ObjectTypePubKey,
+		Version:      2,
+		StreamNumber: 1,
+	},
 	Behavior:      0,
 	SigningKey:    pubKey1,
 	EncryptionKey: pubKey2,
 }
 
-var expandedPubKey = &wire.MsgPubKey{
-	Nonce:         123123,                   // 0x1e0f3
-	ExpiresTime:   time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-	ObjectType:    wire.ObjectTypePubKey,
-	Version:       3,
-	StreamNumber:  1,
+var expandedPubKey = &obj.PubKey{
+	ObjectHeader: wire.ObjectHeader{
+		Nonce:        123123,                   // 0x1e0f3
+		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+		ObjectType:   wire.ObjectTypePubKey,
+		Version:      3,
+		StreamNumber: 1,
+	},
 	Behavior:      0,
 	SigningKey:    pubKey1,
 	EncryptionKey: pubKey2,
@@ -455,12 +456,14 @@ var expandedPubKey = &wire.MsgPubKey{
 	Signature:     []byte{0, 1, 2, 3},
 }
 
-var encryptedPubKey = &wire.MsgPubKey{
-	Nonce:         123123,                   // 0x1e0f3
-	ExpiresTime:   time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-	ObjectType:    wire.ObjectTypePubKey,
-	Version:       4,
-	StreamNumber:  1,
+var encryptedPubKey = &obj.PubKey{
+	ObjectHeader: wire.ObjectHeader{
+		Nonce:        123123,                   // 0x1e0f3
+		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+		ObjectType:   wire.ObjectTypePubKey,
+		Version:      4,
+		StreamNumber: 1,
+	},
 	Behavior:      0,
 	SigningKey:    nil,
 	EncryptionKey: nil,
@@ -578,12 +581,14 @@ var encryptedPubKeyEncoded = []byte{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // encrypted
 }
 
-var invalidPubKeyVersion = &wire.MsgPubKey{
-	Nonce:         123123,                   // 0x1e0f3
-	ExpiresTime:   time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-	ObjectType:    wire.ObjectTypePubKey,
-	Version:       5,
-	StreamNumber:  1,
+var invalidPubKeyVersion = &obj.PubKey{
+	ObjectHeader: wire.ObjectHeader{
+		Nonce:        123123,                   // 0x1e0f3
+		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+		ObjectType:   wire.ObjectTypePubKey,
+		Version:      5,
+		StreamNumber: 1,
+	},
 	Behavior:      0,
 	SigningKey:    pubKey1,
 	EncryptionKey: pubKey2,

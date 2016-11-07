@@ -6,7 +6,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package fixed
 
 import (
 	"bytes"
@@ -40,9 +40,9 @@ func (w *fixedWriter) Bytes() []byte {
 	return w.b
 }
 
-// newFixedWriter returns a new io.Writer that will error once more bytes than
+// NewWriter returns a new io.Writer that will error once more bytes than
 // the specified max have been written.
-func newFixedWriter(max int) io.Writer {
+func NewWriter(max int) io.Writer {
 	b := make([]byte, max, max)
 	fw := fixedWriter{b, 0}
 	return &fw
@@ -67,9 +67,9 @@ func (fr *fixedReader) Read(p []byte) (n int, err error) {
 	return
 }
 
-// newFixedReader returns a new io.Reader that will error once more bytes than
+// NewReader returns a new io.Reader that will error once more bytes than
 // the specified max have been read.
-func newFixedReader(max int, buf []byte) io.Reader {
+func NewReader(max int, buf []byte) io.Reader {
 	b := make([]byte, max, max)
 	if buf != nil {
 		copy(b[:], buf)

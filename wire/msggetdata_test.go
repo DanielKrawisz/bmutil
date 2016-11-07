@@ -14,8 +14,9 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/wire/fixed"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // TestGetData tests the MsgGetData API.
@@ -216,7 +217,7 @@ func TestGetDataWireErrors(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire.format.
-		w := newFixedWriter(test.max)
+		w := fixed.NewWriter(test.max)
 		err := test.in.Encode(w)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
 			t.Errorf("Encode #%d wrong error got: %v, want: %v",
@@ -236,7 +237,7 @@ func TestGetDataWireErrors(t *testing.T) {
 
 		// Decode from wire.format.
 		var msg wire.MsgGetData
-		r := newFixedReader(test.max, test.buf)
+		r := fixed.NewReader(test.max, test.buf)
 		err = msg.Decode(r)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("Decode #%d wrong error got: %v, want: %v",

@@ -3,15 +3,17 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire
+package obj
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"time"
 
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/wire"
 )
 
 const (
@@ -31,50 +33,45 @@ const (
 	signatureMaxLength = 80
 )
 
-// MsgPubKey implements the Message interface and represents a pubkey sent in
+// PubKey implements the Message interface and represents a pubkey sent in
 // response to MsgGetPubKey.
-type MsgPubKey struct {
-	Nonce         uint64
-	ExpiresTime   time.Time
-	ObjectType    ObjectType
-	Version       uint64
-	StreamNumber  uint64
+type PubKey struct {
+	wire.ObjectHeader
 	Behavior      uint32
-	SigningKey    *PubKey
-	EncryptionKey *PubKey
+	SigningKey    *wire.PubKey
+	EncryptionKey *wire.PubKey
 	NonceTrials   uint64
 	ExtraBytes    uint64
 	Signature     []byte
-	Tag           *ShaHash
+	Tag           *wire.ShaHash
 	Encrypted     []byte
 }
 
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
-func (msg *MsgPubKey) Decode(r io.Reader) error {
+func (msg *PubKey) Decode(r io.Reader) error {
 	var err error
-	msg.Nonce, msg.ExpiresTime, msg.ObjectType, msg.Version,
-		msg.StreamNumber, err = DecodeMsgObjectHeader(r)
+	msg.ObjectHeader, err = wire.DecodeMsgObjectHeader(r)
 	if err != nil {
 		return err
 	}
 
-	if msg.ObjectType != ObjectTypePubKey {
+	if msg.ObjectType != wire.ObjectTypePubKey {
 		str := fmt.Sprintf("Object Type should be %d, but is %d",
-			ObjectTypePubKey, msg.ObjectType)
-		return messageError("Decode", str)
+			wire.ObjectTypePubKey, msg.ObjectType)
+		return wire.NewMessageError("Decode", str)
 	}
 
 	switch msg.Version {
 	case SimplePubKeyVersion:
-		msg.SigningKey = &PubKey{}
-		msg.EncryptionKey = &PubKey{}
-		return readElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+		msg.SigningKey = &wire.PubKey{}
+		msg.EncryptionKey = &wire.PubKey{}
+		return wire.ReadElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
 	case ExtendedPubKeyVersion:
-		msg.SigningKey = &PubKey{}
-		msg.EncryptionKey = &PubKey{}
+		msg.SigningKey = &wire.PubKey{}
+		msg.EncryptionKey = &wire.PubKey{}
 		var sigLength uint64
-		err = readElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+		err = wire.ReadElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
 		if err != nil {
 			return err
 		}
@@ -91,14 +88,14 @@ func (msg *MsgPubKey) Decode(r io.Reader) error {
 			str := fmt.Sprintf("signature length exceeds max length - "+
 				"indicates %d, but max length is %d",
 				sigLength, signatureMaxLength)
-			return messageError("Decode", str)
+			return wire.NewMessageError("Decode", str)
 		}
 		msg.Signature = make([]byte, sigLength)
 		_, err = io.ReadFull(r, msg.Signature)
 		return err
 	case EncryptedPubKeyVersion:
-		msg.Tag = &ShaHash{}
-		if err = readElement(r, msg.Tag); err != nil {
+		msg.Tag = &wire.ShaHash{}
+		if err = wire.ReadElement(r, msg.Tag); err != nil {
 			return err
 		}
 		// The rest is the encrypted data, accessible only to those that know
@@ -106,24 +103,16 @@ func (msg *MsgPubKey) Decode(r io.Reader) error {
 		msg.Encrypted, err = ioutil.ReadAll(r)
 		return err
 	default:
-		return messageError("MsgPubKey.Decode", "unsupported PubKey version")
+		return wire.NewMessageError("PubKey.Decode", "unsupported PubKey version")
 	}
 }
 
-// Encode encodes the receiver to w using the bitmessage protocol encoding.
-// This is part of the Message interface implementation.
-func (msg *MsgPubKey) Encode(w io.Writer) error {
-	err := EncodeMsgObjectHeader(w, msg.Nonce, msg.ExpiresTime, msg.ObjectType,
-		msg.Version, msg.StreamNumber)
-	if err != nil {
-		return err
-	}
-
+func (msg *PubKey) encodePayload(w io.Writer) error {
 	switch msg.Version {
 	case SimplePubKeyVersion:
-		return writeElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+		return wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
 	case ExtendedPubKeyVersion:
-		err = writeElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+		err := wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
 		if err != nil {
 			return err
 		}
@@ -140,49 +129,53 @@ func (msg *MsgPubKey) Encode(w io.Writer) error {
 		_, err = w.Write(msg.Signature)
 		return err
 	case EncryptedPubKeyVersion:
-		if err = writeElement(w, msg.Tag); err != nil {
+		if err := wire.WriteElement(w, msg.Tag); err != nil {
 			return err
 		}
 		// The rest is the encrypted data, accessible only to the holder
 		// of the private key to whom it's addressed.
-		_, err = w.Write(msg.Encrypted)
+		_, err := w.Write(msg.Encrypted)
 		return err
 	default:
-		return messageError("MsgPubKey.Encode", "unsupported PubKey version")
+		return wire.NewMessageError("PubKey.Encode", "unsupported PubKey version")
 	}
 }
 
-// Command returns the protocol command string for the message. This is part
-// of the Message interface implementation.
-func (msg *MsgPubKey) Command() string {
-	return CmdObject
+// Encode encodes the receiver to w using the bitmessage protocol encoding.
+// This is part of the Message interface implementation.
+func (msg *PubKey) Encode(w io.Writer) error {
+	err := msg.ObjectHeader.Encode(w)
+	if err != nil {
+		return err
+	}
+
+	return msg.encodePayload(w)
 }
 
 // MaxPayloadLength returns the maximum length the payload can be for the
 // receiver. This is part of the Message interface implementation.
-func (msg *MsgPubKey) MaxPayloadLength() int {
+func (msg *PubKey) MaxPayloadLength() int {
 	// TODO find a sensible value based on pubkey version
-	return MaxPayloadOfMsgObject
+	return wire.MaxPayloadOfMsgObject
 }
 
-func (msg *MsgPubKey) String() string {
+func (msg *PubKey) String() string {
 	return fmt.Sprintf("pubkey: v%d %d %s %d %x", msg.Version, msg.Nonce, msg.ExpiresTime, msg.StreamNumber, msg.Tag)
 }
 
-// EncodeForSigning encodes MsgPubKey so that it can be hashed and signed.
-func (msg *MsgPubKey) EncodeForSigning(w io.Writer) error {
-	err := EncodeMsgObjectSignatureHeader(w, msg.ExpiresTime, msg.ObjectType,
-		msg.Version, msg.StreamNumber)
+// EncodeForSigning encodes PubKey so that it can be hashed and signed.
+func (msg *PubKey) EncodeForSigning(w io.Writer) error {
+	err := msg.ObjectHeader.EncodeForSigning(w)
 	if err != nil {
 		return err
 	}
 	if msg.Version == EncryptedPubKeyVersion {
-		err = writeElement(w, msg.Tag)
+		err = wire.WriteElement(w, msg.Tag)
 		if err != nil {
 			return err
 		}
 	}
-	err = writeElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+	err = wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
 	if err != nil {
 		return err
 	}
@@ -196,9 +189,9 @@ func (msg *MsgPubKey) EncodeForSigning(w io.Writer) error {
 	return nil
 }
 
-// EncodeForEncryption encodes MsgPubKey so that it can be encrypted.
-func (msg *MsgPubKey) EncodeForEncryption(w io.Writer) error {
-	err := writeElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+// EncodeForEncryption encodes PubKey so that it can be encrypted.
+func (msg *PubKey) EncodeForEncryption(w io.Writer) error {
+	err := wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
 	if err != nil {
 		return err
 	}
@@ -218,11 +211,11 @@ func (msg *MsgPubKey) EncodeForEncryption(w io.Writer) error {
 	return nil
 }
 
-// DecodeFromDecrypted decodes MsgPubKey from its decrypted form.
-func (msg *MsgPubKey) DecodeFromDecrypted(r io.Reader) error {
-	msg.SigningKey = &PubKey{}
-	msg.EncryptionKey = &PubKey{}
-	err := readElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+// DecodeFromDecrypted decodes PubKey from its decrypted form.
+func (msg *PubKey) DecodeFromDecrypted(r io.Reader) error {
+	msg.SigningKey = &wire.PubKey{}
+	msg.EncryptionKey = &wire.PubKey{}
+	err := wire.ReadElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
 	if err != nil {
 		return err
 	}
@@ -240,25 +233,50 @@ func (msg *MsgPubKey) DecodeFromDecrypted(r io.Reader) error {
 		str := fmt.Sprintf("signature length exceeds max length - "+
 			"indicates %d, but max length is %d",
 			sigLength, signatureMaxLength)
-		return messageError("DecodeFromDecrypted", str)
+		return wire.NewMessageError("DecodeFromDecrypted", str)
 	}
 	msg.Signature = make([]byte, sigLength)
 	_, err = io.ReadFull(r, msg.Signature)
 	return err
 }
 
-// NewMsgPubKey returns a new object message that conforms to the Message
+// Header returns the object header.
+func (msg *PubKey) Header() *wire.ObjectHeader {
+	return &msg.ObjectHeader
+}
+
+// ObjectPayload return the object payload of the message.
+func (msg *PubKey) Payload() []byte {
+	w := &bytes.Buffer{}
+	msg.encodePayload(w)
+	return w.Bytes()
+}
+
+// MsgObject transforms the PubKey to a *MsgObject.
+func (msg *PubKey) MsgObject() *wire.MsgObject {
+	return wire.NewMsgObject(msg.ObjectHeader.Nonce,
+		msg.ObjectHeader.ExpiresTime, msg.ObjectHeader.ObjectType,
+		msg.ObjectHeader.Version, msg.ObjectHeader.StreamNumber, msg.Payload())
+}
+
+func (msg *PubKey) InventoryHash() *wire.ShaHash {
+	return msg.MsgObject().InventoryHash()
+}
+
+// NewPubKey returns a new object message that conforms to the Message
 // interface using the passed parameters and defaults for the remaining fields.
-func NewMsgPubKey(nonce uint64, expires time.Time,
+func NewPubKey(nonce uint64, expires time.Time,
 	version, streamNumber uint64, behavior uint32,
-	signingKey, encryptKey *PubKey, nonceTrials, extraBytes uint64,
-	signature []byte, tag *ShaHash, encrypted []byte) *MsgPubKey {
-	return &MsgPubKey{
-		Nonce:         nonce,
-		ExpiresTime:   expires,
-		ObjectType:    ObjectTypePubKey,
-		Version:       version,
-		StreamNumber:  streamNumber,
+	signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes uint64,
+	signature []byte, tag *wire.ShaHash, encrypted []byte) *PubKey {
+	return &PubKey{
+		ObjectHeader: wire.ObjectHeader{
+			Nonce:        nonce,
+			ExpiresTime:  expires,
+			ObjectType:   wire.ObjectTypePubKey,
+			Version:      version,
+			StreamNumber: streamNumber,
+		},
 		Behavior:      behavior,
 		SigningKey:    signingKey,
 		EncryptionKey: encryptKey,

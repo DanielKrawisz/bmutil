@@ -83,7 +83,7 @@ func (msg *MsgVersion) AddService(service ServiceFlag) {
 // This is part of the Message interface implementation.
 func (msg *MsgVersion) Decode(r io.Reader) error {
 	var sec int64
-	err := readElements(r, &msg.ProtocolVersion, &msg.Services, &sec)
+	err := ReadElements(r, &msg.ProtocolVersion, &msg.Services, &sec)
 	if err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (msg *MsgVersion) Decode(r io.Reader) error {
 	if err != nil {
 		return err
 	}
-	err = readElement(r, &msg.Nonce)
+	err = ReadElement(r, &msg.Nonce)
 	if err != nil {
 		return err
 	}
@@ -144,7 +144,7 @@ func (msg *MsgVersion) Encode(w io.Writer) error {
 		return err
 	}
 
-	err = writeElements(w, msg.ProtocolVersion, msg.Services,
+	err = WriteElements(w, msg.ProtocolVersion, msg.Services,
 		msg.Timestamp.Unix())
 	if err != nil {
 		return err
@@ -160,7 +160,7 @@ func (msg *MsgVersion) Encode(w io.Writer) error {
 		return err
 	}
 
-	err = writeElement(w, msg.Nonce)
+	err = WriteElement(w, msg.Nonce)
 	if err != nil {
 		return err
 	}
@@ -251,7 +251,7 @@ func validateUserAgent(userAgent string) error {
 	if len(userAgent) > MaxUserAgentLen {
 		str := fmt.Sprintf("user agent too long [len %v, max %v]",
 			len(userAgent), MaxUserAgentLen)
-		return messageError("MsgVersion", str)
+		return NewMessageError("MsgVersion", str)
 	}
 	return nil
 }

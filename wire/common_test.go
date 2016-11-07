@@ -16,8 +16,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/wire/fixed"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // fakeRandReader implements the io.Reader interface and is used to force
@@ -228,7 +229,7 @@ func TestElementWireErrors(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire.format.
-		w := newFixedWriter(test.max)
+		w := fixed.NewWriter(test.max)
 		err := wire.TstWriteElement(w, test.in)
 		if err != test.writeErr {
 			t.Errorf("writeElement #%d wrong error got: %v, want: %v",
@@ -237,7 +238,7 @@ func TestElementWireErrors(t *testing.T) {
 		}
 
 		// Decode from wire.format.
-		r := newFixedReader(test.max, nil)
+		r := fixed.NewReader(test.max, nil)
 		val := test.in
 		if reflect.ValueOf(test.in).Kind() != reflect.Ptr {
 			val = reflect.New(reflect.TypeOf(test.in)).Interface()

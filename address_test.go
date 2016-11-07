@@ -36,7 +36,7 @@ var addressTests = []addressTestPair{
 }
 
 func TestEncodeAddress(t *testing.T) {
-	
+
 	for _, pair := range addressTests {
 		v, err := pair.address.Encode()
 		if err != nil {

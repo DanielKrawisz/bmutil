@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire_test
+package obj_test
 
 import (
 	"bytes"
@@ -12,22 +12,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/wire/fixed"
+	"github.com/DanielKrawisz/bmutil/wire/obj"
+	"github.com/davecgh/go-spew/spew"
 )
 
 // TestMsg tests the MsgMsg API.
 func TestMsg(t *testing.T) {
 
 	// Ensure the command is expected value.
-	wantCmd := "object"
 	now := time.Now()
 	enc := make([]byte, 99)
-	msg := wire.NewMsgMsg(83928, now, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
-	if cmd := msg.Command(); cmd != wantCmd {
-		t.Errorf("NewMsgMsg: wrong command - got %v want %v",
-			cmd, wantCmd)
-	}
+	msg := obj.NewMessage(83928, now, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
 
 	// Ensure max payload is expected value for latest protocol version.
 	wantPayload := wire.MaxPayloadOfMsgObject
@@ -45,11 +42,11 @@ func TestMsg(t *testing.T) {
 	return
 }
 
-// TestMsgWire tests the MsgMsg wire.encode and decode for various versions.
-func TestMsgWire(t *testing.T) {
+// TestMessage tests the obj.Message wire.encode and decode for various versions.
+func TestMessage(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	enc := make([]byte, 128)
-	msgBase := wire.NewMsgMsg(83928, expires, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
+	msgBase := obj.NewMessage(83928, expires, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
 	ripeBytes := make([]byte, 20)
 	ripe, err := wire.NewRipeHash(ripeBytes)
 	if err != nil {
@@ -58,11 +55,11 @@ func TestMsgWire(t *testing.T) {
 	m := make([]byte, 32)
 	a := make([]byte, 8)
 	s := make([]byte, 16)
-	msgFilled := wire.NewMsgMsg(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
+	msgFilled := obj.NewMessage(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
 
 	tests := []struct {
-		in  *wire.MsgMsg // Message to encode
-		out *wire.MsgMsg // Expected decoded message
+		in  *obj.Message // Message to encode
+		out *obj.Message // Expected decoded message
 		buf []byte       // Wire encoding
 	}{
 		{
@@ -93,7 +90,7 @@ func TestMsgWire(t *testing.T) {
 		}
 
 		// Decode the message from wire.format.
-		var msg wire.MsgMsg
+		var msg obj.Message
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.Decode(rbuf)
 		if err != nil {
@@ -117,7 +114,7 @@ func TestMsgWireError(t *testing.T) {
 	wrongObjectTypeEncoded[19] = 0
 
 	tests := []struct {
-		in       *wire.MsgMsg // Value to encode
+		in       *obj.Message // Value to encode
 		buf      []byte       // Wire encoding
 		max      int          // Max size of fixed buffer to induce errors
 		writeErr error        // Expected write error
@@ -140,7 +137,7 @@ func TestMsgWireError(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// Encode to wire.format.
-		w := newFixedWriter(test.max)
+		w := fixed.NewWriter(test.max)
 		err := test.in.Encode(w)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.writeErr) {
 			t.Errorf("Encode #%d wrong error got: %v, want: %v",
@@ -159,7 +156,7 @@ func TestMsgWireError(t *testing.T) {
 		}
 
 		// Decode from wire.format.
-		var msg wire.MsgMsg
+		var msg obj.Message
 		buf := bytes.NewBuffer(test.buf[0:test.max])
 		err = msg.Decode(buf)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
@@ -192,11 +189,11 @@ func TestMsgMsgEncryption(t *testing.T) {
 	m := make([]byte, 32)
 	a := make([]byte, 8)
 	s := make([]byte, 16)
-	msgFilled := wire.NewMsgMsg(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
+	msgFilled := obj.NewMessage(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
 
 	tests := []struct {
-		in  *wire.MsgMsg // Message to encode
-		out *wire.MsgMsg // Expected decoded message
+		in  *obj.Message // Message to encode
+		out *obj.Message // Expected decoded message
 		buf []byte       // Wire encoding
 	}{
 		{
@@ -222,7 +219,7 @@ func TestMsgMsgEncryption(t *testing.T) {
 		}
 
 		// Decode the message from wire.format.
-		var msg wire.MsgMsg
+		var msg obj.Message
 
 		rbuf := bytes.NewReader(test.buf)
 		err = msg.DecodeFromDecrypted(rbuf)
@@ -261,10 +258,10 @@ func TestMsgEncryptError(t *testing.T) {
 	m := make([]byte, 32)
 	a := make([]byte, 8)
 	s := make([]byte, 16)
-	msgFilled := wire.NewMsgMsg(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
+	msgFilled := obj.NewMessage(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
 
 	tests := []struct {
-		in  *wire.MsgMsg // Value to encode
+		in  *obj.Message // Value to encode
 		buf []byte       // Wire encoding
 		max int          // Max size of fixed buffer to induce errors
 	}{
@@ -299,7 +296,7 @@ func TestMsgEncryptError(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// EncodeForEncryption.
-		w := newFixedWriter(test.max)
+		w := fixed.NewWriter(test.max)
 		err := test.in.EncodeForEncryption(w)
 		if err == nil {
 			t.Errorf("EncodeForEncryption #%d no error returned", i)
@@ -307,7 +304,7 @@ func TestMsgEncryptError(t *testing.T) {
 		}
 
 		// DecodeFromDecrypted.
-		var msg wire.MsgMsg
+		var msg obj.Message
 		buf := bytes.NewBuffer(test.buf[0:test.max])
 		err = msg.DecodeFromDecrypted(buf)
 		if err == nil {
@@ -317,7 +314,7 @@ func TestMsgEncryptError(t *testing.T) {
 	}
 
 	// Try to decode too long a message.
-	var msg wire.MsgMsg
+	var msg obj.Message
 	filledMsgEncodedForEncryption[161] = 0xff
 	filledMsgEncodedForEncryption[162] = 200
 	filledMsgEncodedForEncryption[163] = 200
@@ -369,10 +366,10 @@ func TestMsgMsgEncodeForSigning(t *testing.T) {
 	m := make([]byte, 32)
 	a := make([]byte, 8)
 	s := make([]byte, 16)
-	msgFilled := wire.NewMsgMsg(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
+	msgFilled := obj.NewMessage(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
 
 	tests := []struct {
-		in  *wire.MsgMsg // Message to encode
+		in  *obj.Message // Message to encode
 		buf []byte       // Wire encoding
 	}{
 		{
@@ -412,10 +409,10 @@ func TestMsgEncodeForSigningError(t *testing.T) {
 	m := make([]byte, 32)
 	a := make([]byte, 8)
 	s := make([]byte, 16)
-	msgFilled := wire.NewMsgMsg(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
+	msgFilled := obj.NewMessage(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
 
 	tests := []struct {
-		in  *wire.MsgMsg // Value to encode
+		in  *obj.Message // Value to encode
 		max int          // Max size of fixed buffer to induce errors
 	}{
 		// Force error in the header.
@@ -447,7 +444,7 @@ func TestMsgEncodeForSigningError(t *testing.T) {
 	t.Logf("Running %d tests", len(tests))
 	for i, test := range tests {
 		// EncodeForEncryption.
-		w := newFixedWriter(test.max + 14)
+		w := fixed.NewWriter(test.max + 14)
 		err := test.in.EncodeForSigning(w)
 		if err == nil {
 			t.Errorf("EncodeForEncryption #%d no error returned", i)
@@ -457,12 +454,14 @@ func TestMsgEncodeForSigningError(t *testing.T) {
 }
 
 // baseMsg is used in the various tests as a baseline MsgMsg.
-var baseMsg = &wire.MsgMsg{
-	Nonce:        123123,                   // 0x1e0f3
-	ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-	ObjectType:   wire.ObjectTypeMsg,
-	Version:      2,
-	StreamNumber: 1,
+var baseMsg = &obj.Message{
+	ObjectHeader: wire.ObjectHeader{
+		Nonce:        123123,                   // 0x1e0f3
+		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
+		ObjectType:   wire.ObjectTypeMsg,
+		Version:      2,
+		StreamNumber: 1,
+	},
 	Encrypted: []byte{
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,

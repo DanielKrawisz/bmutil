@@ -10,10 +10,10 @@ import (
 	"crypto/sha512"
 	"errors"
 
-	"github.com/btcsuite/btcd/btcec"
-	"github.com/btcsuite/btcutil/hdkeychain"
 	"github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/pow"
+	"github.com/btcsuite/btcd/btcec"
+	"github.com/btcsuite/btcutil/hdkeychain"
 	"golang.org/x/crypto/ripemd160"
 )
 

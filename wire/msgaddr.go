@@ -38,7 +38,7 @@ func (msg *MsgAddr) AddAddress(na *NetAddress) error {
 	if len(msg.AddrList)+1 > MaxAddrPerMsg {
 		str := fmt.Sprintf("too many addresses in message [max %v]",
 			MaxAddrPerMsg)
-		return messageError("MsgAddr.AddAddress", str)
+		return NewMessageError("MsgAddr.AddAddress", str)
 	}
 
 	msg.AddrList = append(msg.AddrList, na)
@@ -73,7 +73,7 @@ func (msg *MsgAddr) Decode(r io.Reader) error {
 	if count > MaxAddrPerMsg {
 		str := fmt.Sprintf("too many addresses for message "+
 			"[count %v, max %v]", count, MaxAddrPerMsg)
-		return messageError("MsgAddr.Decode", str)
+		return NewMessageError("MsgAddr.Decode", str)
 	}
 
 	msg.AddrList = make([]*NetAddress, 0, count)
@@ -95,7 +95,7 @@ func (msg *MsgAddr) Encode(w io.Writer) error {
 	if count > MaxAddrPerMsg {
 		str := fmt.Sprintf("too many addresses for message "+
 			"[count %v, max %v]", count, MaxAddrPerMsg)
-		return messageError("MsgAddr.Encode", str)
+		return NewMessageError("MsgAddr.Encode", str)
 	}
 
 	err := bmutil.WriteVarInt(w, uint64(count))

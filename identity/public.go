@@ -8,9 +8,9 @@ package identity
 import (
 	"math"
 
-	"github.com/btcsuite/btcd/btcec"
 	"github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/pow"
+	"github.com/btcsuite/btcd/btcec"
 )
 
 // Public contains the identity of the remote user, which includes public

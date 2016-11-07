@@ -25,16 +25,16 @@ func TstRandomUint64(r io.Reader) (uint64, error) {
 	return randomUint64(r)
 }
 
-// TstReadElement makes the internal readElement function available to the
+// TstReadElement makes the internal ReadElement function available to the
 // test package.
 func TstReadElement(r io.Reader, element interface{}) error {
-	return readElement(r, element)
+	return ReadElement(r, element)
 }
 
-// TstWriteElement makes the internal writeElement function available to the
+// TstWriteElement makes the internal WriteElement function available to the
 // test package.
 func TstWriteElement(w io.Writer, element interface{}) error {
-	return writeElement(w, element)
+	return WriteElement(w, element)
 }
 
 // TstReadNetAddress makes the internal readNetAddress function available to
