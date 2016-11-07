@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 	"time"
+	"bytes"
 
 	"github.com/DanielKrawisz/bmutil"
 )
@@ -285,4 +286,16 @@ func NewMsgMsg(nonce uint64, expires time.Time, version, streamNumber uint64, en
 		Ack:                ack,
 		Signature:          signature,
 	}
+}
+
+// DecodeMsgMsg takes a byte array and turns it into an object message.
+func DecodeMsgMsg(obj []byte) (*MsgMsg, error) {
+	// Make sure that object type specific checks happen first.
+	var msg *MsgMsg
+	err := msg.Decode(bytes.NewReader(obj))
+	if err != nil {
+		return nil, err
+	}
+	
+	return msg, nil
 }
