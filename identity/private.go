@@ -27,21 +27,22 @@ const (
 // about stream number and address version.
 type Private struct {
 	bmutil.Address
-	NonceTrialsPerByte uint64
-	ExtraBytes         uint64
-	SigningKey         *btcec.PrivateKey
-	EncryptionKey      *btcec.PrivateKey
-	Behavior           uint32
+	pow.Data
+	SigningKey    *btcec.PrivateKey
+	EncryptionKey *btcec.PrivateKey
+	Behavior      uint32
 }
 
 // ToPublic turns a Private identity object into Public identity object.
 func (id *Private) ToPublic() *Public {
 	return &Public{
-		Address:            id.Address,
-		NonceTrialsPerByte: id.NonceTrialsPerByte,
-		ExtraBytes:         id.ExtraBytes,
-		SigningKey:         id.SigningKey.PubKey(),
-		EncryptionKey:      id.EncryptionKey.PubKey(),
+		Address: id.Address,
+		Data: pow.Data{
+			NonceTrialsPerByte: id.NonceTrialsPerByte,
+			ExtraBytes:         id.ExtraBytes,
+		},
+		SigningKey:    id.SigningKey.PubKey(),
+		EncryptionKey: id.EncryptionKey.PubKey(),
 	}
 }
 
@@ -229,11 +230,13 @@ func ImportWIF(address, signingKeyWif, encryptionKeyWif string,
 	}
 
 	priv := &Private{
-		Address:            *addr,
-		SigningKey:         privSigningKey,
-		EncryptionKey:      privEncryptionKey,
-		NonceTrialsPerByte: nonceTrials,
-		ExtraBytes:         extraBytes,
+		Address:       *addr,
+		SigningKey:    privSigningKey,
+		EncryptionKey: privEncryptionKey,
+		Data: pow.Data{
+			NonceTrialsPerByte: nonceTrials,
+			ExtraBytes:         extraBytes,
+		},
 	}
 
 	// check if everything is valid

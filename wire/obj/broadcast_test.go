@@ -116,6 +116,9 @@ func TestBroadcastWireError(t *testing.T) {
 	copy(wrongObjectTypeEncoded, baseMsgEncoded)
 	wrongObjectTypeEncoded[19] = 0
 
+	baseBroadcast := obj.BaseBroadcast()
+	taggedBroadcast := obj.TaggedBroadcast()
+
 	tests := []struct {
 		in       *obj.Broadcast // Value to encode
 		buf      []byte         // Wire encoding
@@ -235,11 +238,7 @@ func TestBroadcastEncrypt(t *testing.T) {
 		}
 
 		// Copy the fields that are not written by DecodeFromDecrypted
-		msg.Nonce = test.in.Nonce
-		msg.ExpiresTime = test.in.ExpiresTime
-		msg.ObjectType = test.in.ObjectType
-		msg.Version = test.in.Version
-		msg.StreamNumber = test.in.StreamNumber
+		msg.SetHeader(test.in.Header())
 		msg.Tag = test.in.Tag
 		msg.Encrypted = test.in.Encrypted
 
@@ -433,52 +432,6 @@ func TestBroadcastEncodeForSigningError(t *testing.T) {
 			continue
 		}
 	}
-}
-
-// baseBroadcast is used in the various tests as a baseline Broadcast.
-var baseBroadcast = &obj.Broadcast{
-	ObjectHeader: wire.ObjectHeader{
-		Nonce:        123123,                   // 0x1e0f3
-		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		ObjectType:   wire.ObjectTypeBroadcast,
-		Version:      2,
-		StreamNumber: 1,
-	},
-	Encrypted: []byte{
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	},
-}
-
-// baseBroadcast is a broadcast from a v4 address (includes a tag).
-var taggedBroadcast = &obj.Broadcast{
-	ObjectHeader: wire.ObjectHeader{
-		Nonce:        123123,                   // 0x1e0f3
-		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		ObjectType:   wire.ObjectTypeBroadcast,
-		Version:      5,
-		StreamNumber: 1,
-	},
-	Tag: &wire.ShaHash{
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	},
-	Encrypted: []byte{
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	},
 }
 
 // baseBroadcastEncoded is the wire.encoded bytes for baseBroadcast (just encrypted data)

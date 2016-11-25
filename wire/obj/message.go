@@ -20,7 +20,7 @@ import (
 // two addresses. It can be decrypted only by those that have the private
 // encryption key that corresponds to the destination address.
 type Message struct {
-	wire.ObjectHeader
+	header             *wire.ObjectHeader
 	Encrypted          []byte
 	FromAddressVersion uint64
 	FromStreamNumber   uint64
@@ -40,14 +40,14 @@ type Message struct {
 // This is part of the Message interface implementation.
 func (msg *Message) Decode(r io.Reader) error {
 	var err error
-	msg.ObjectHeader, err = wire.DecodeMsgObjectHeader(r)
+	msg.header, err = wire.DecodeMsgObjectHeader(r)
 	if err != nil {
 		return err
 	}
 
-	if msg.ObjectType != wire.ObjectTypeMsg {
+	if msg.header.ObjectType != wire.ObjectTypeMsg {
 		str := fmt.Sprintf("Object Type should be %d, but is %d",
-			wire.ObjectTypeMsg, msg.ObjectType)
+			wire.ObjectTypeMsg, msg.header.ObjectType)
 		return wire.NewMessageError("Decode", str)
 	}
 
@@ -59,7 +59,7 @@ func (msg *Message) Decode(r io.Reader) error {
 // Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *Message) Encode(w io.Writer) error {
-	err := msg.ObjectHeader.Encode(w)
+	err := msg.header.Encode(w)
 	if err != nil {
 		return err
 	}
@@ -75,12 +75,17 @@ func (msg *Message) MaxPayloadLength() int {
 }
 
 func (msg *Message) String() string {
-	return fmt.Sprintf("msg: v%d %d %s %d %x", msg.Version, msg.Nonce, msg.ExpiresTime, msg.StreamNumber, msg.Encrypted)
+	return fmt.Sprintf("msg: v%d %d %s %d %x",
+		msg.header.Version,
+		msg.header.Nonce,
+		msg.header.ExpiresTime,
+		msg.header.StreamNumber,
+		msg.Encrypted)
 }
 
 // EncodeForSigning encodes Message so that it can be hashed and signed.
 func (msg *Message) EncodeForSigning(w io.Writer) error {
-	err := msg.ObjectHeader.EncodeForSigning(w)
+	err := msg.header.EncodeForSigning(w)
 	if err != nil {
 		return err
 	}
@@ -253,7 +258,7 @@ func (msg *Message) DecodeFromDecrypted(r io.Reader) error {
 
 // Header returns the object header.
 func (msg *Message) Header() *wire.ObjectHeader {
-	return &msg.ObjectHeader
+	return msg.header
 }
 
 // Payload return the object payload of the message.
@@ -263,11 +268,10 @@ func (msg *Message) Payload() []byte {
 
 // MsgObject transforms the PubKeyObject to a *MsgObject.
 func (msg *Message) MsgObject() *wire.MsgObject {
-	return wire.NewMsgObject(msg.ObjectHeader.Nonce,
-		msg.ObjectHeader.ExpiresTime, msg.ObjectHeader.ObjectType,
-		msg.ObjectHeader.Version, msg.ObjectHeader.StreamNumber, msg.Payload())
+	return wire.NewMsgObject(msg.header, msg.Encrypted)
 }
 
+// InventoryHash returns the inventory hash of the message.
 func (msg *Message) InventoryHash() *wire.ShaHash {
 	return msg.MsgObject().InventoryHash()
 }
@@ -279,7 +283,7 @@ func NewMessage(nonce uint64, expires time.Time, version, streamNumber uint64,
 	signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes uint64,
 	destination *wire.RipeHash, encoding uint64, message, ack, signature []byte) *Message {
 	return &Message{
-		ObjectHeader: wire.ObjectHeader{
+		header: &wire.ObjectHeader{
 			Nonce:        nonce,
 			ExpiresTime:  expires,
 			ObjectType:   wire.ObjectTypeMsg,

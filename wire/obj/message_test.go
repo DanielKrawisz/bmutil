@@ -113,6 +113,8 @@ func TestMsgWireError(t *testing.T) {
 	copy(wrongObjectTypeEncoded, baseMsgEncoded)
 	wrongObjectTypeEncoded[19] = 0
 
+	baseMsg := obj.BaseMessage()
+
 	tests := []struct {
 		in       *obj.Message // Value to encode
 		buf      []byte       // Wire encoding
@@ -229,11 +231,7 @@ func TestMsgMsgEncryption(t *testing.T) {
 		}
 
 		// Copy the fields that are not written by DecodeFromDecrypted
-		msg.Nonce = test.in.Nonce
-		msg.ExpiresTime = test.in.ExpiresTime
-		msg.ObjectType = test.in.ObjectType
-		msg.Version = test.in.Version
-		msg.StreamNumber = test.in.StreamNumber
+		msg.SetHeader(test.in.Header())
 		msg.Encrypted = test.in.Encrypted
 
 		if !reflect.DeepEqual(&msg, test.out) {
@@ -451,27 +449,6 @@ func TestMsgEncodeForSigningError(t *testing.T) {
 			continue
 		}
 	}
-}
-
-// baseMsg is used in the various tests as a baseline MsgMsg.
-var baseMsg = &obj.Message{
-	ObjectHeader: wire.ObjectHeader{
-		Nonce:        123123,                   // 0x1e0f3
-		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		ObjectType:   wire.ObjectTypeMsg,
-		Version:      2,
-		StreamNumber: 1,
-	},
-	Encrypted: []byte{
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-	},
 }
 
 // baseMsgEncoded is the wire.encoded bytes for baseMsg (just encrypted data)

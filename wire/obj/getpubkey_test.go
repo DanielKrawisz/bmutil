@@ -148,6 +148,10 @@ func TestGetPubKeyWire(t *testing.T) {
 func TestGetPubKeyWireError(t *testing.T) {
 	wireErr := &wire.MessageError{}
 
+	baseGetPubKey := obj.BaseGetPubKey()
+	tagGetPubKey := obj.TagGetPubKey()
+	invalidGetPubKeyVersion := obj.InvalidGetPubKeyVersion()
+
 	tests := []struct {
 		in       *obj.GetPubKey // Value to encode
 		buf      []byte         // Wire encoding
@@ -218,19 +222,6 @@ func TestGetPubKeyWireError(t *testing.T) {
 	}
 }
 
-// baseGetPubKey is used in the various tests as a baseline GetPubKey.
-var baseGetPubKey = &obj.GetPubKey{
-	ObjectHeader: wire.ObjectHeader{
-		Nonce:        123123,                   // 0x1e0f3
-		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		ObjectType:   wire.ObjectTypeGetPubKey,
-		Version:      3,
-		StreamNumber: 1,
-	},
-	Ripe: &wire.RipeHash{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-	Tag:  nil,
-}
-
 // baseGetPubKeyEncoded is the wire.encoded bytes for baseGetPubKey
 // using version 2 (pre-tag
 var baseGetPubKeyEncoded = []byte{
@@ -242,21 +233,6 @@ var baseGetPubKeyEncoded = []byte{
 	0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, // Ripe
-}
-
-// tagGetPubKey is a pubkey request for a v4 pubkey which includes a tag.
-var tagGetPubKey = &obj.GetPubKey{
-	ObjectHeader: wire.ObjectHeader{
-		Nonce:        123123,                   // 0x1e0f3
-		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		ObjectType:   wire.ObjectTypeGetPubKey,
-		Version:      4,
-		StreamNumber: 1,
-	},
-	Ripe: nil,
-	Tag: &wire.ShaHash{
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 }
 
 // tagGetPubKeyEncoded is the wire.encoded bytes for a v4 pubkey which includes
@@ -271,19 +247,6 @@ var tagGetPubKeyEncoded = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // Ripe
-}
-
-// invalidVersion is a getpubkey message with unsupported version
-var invalidGetPubKeyVersion = &obj.GetPubKey{
-	ObjectHeader: wire.ObjectHeader{
-		Nonce:        123123,                   // 0x1e0f3
-		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		ObjectType:   wire.ObjectTypeGetPubKey,
-		Version:      5,
-		StreamNumber: 1,
-	},
-	Ripe: &wire.RipeHash{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-	Tag:  nil,
 }
 
 // invalidVersionEncoded is an encoded getpubkey message with unsupported version

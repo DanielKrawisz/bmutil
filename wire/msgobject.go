@@ -7,10 +7,8 @@ package wire
 
 import (
 	"bytes"
-	"fmt"
 	"io"
 	"io/ioutil"
-	"time"
 
 	"github.com/DanielKrawisz/bmutil"
 )
@@ -19,24 +17,6 @@ const (
 	// MaxPayloadOfMsgObject is the the maximum payload of object message = 2^18 bytes.
 	// (not to be confused with the object payload)
 	MaxPayloadOfMsgObject = 262144
-)
-
-// ObjectType represents the type of object than an object message contains.
-// Objects in bitmessage are things on the network that get propagated. This can
-// include requests/responses for pubkeys, messages and broadcasts.
-type ObjectType uint32
-
-// There are five types of objects in bitmessage.
-//  - GetPubKey: requests for public keys.
-//  - PubKey: public keys sent in response.
-//  - Msg: bitmessage messages.
-//  - Broadcast: broadcast messages.
-// An ObjectType can also take on other values representing unknown message types.
-const (
-	ObjectTypeGetPubKey ObjectType = 0
-	ObjectTypePubKey    ObjectType = 1
-	ObjectTypeMsg       ObjectType = 2
-	ObjectTypeBroadcast ObjectType = 3
 )
 
 // obStrings is a map of service flags back to their constant names for pretty
@@ -58,7 +38,7 @@ func (t ObjectType) String() string {
 
 // MsgObject implements the Message interface and represents a generic object.
 type MsgObject struct {
-	ObjectHeader
+	header  *ObjectHeader
 	payload []byte
 	invHash *ShaHash
 }
@@ -67,12 +47,14 @@ type MsgObject struct {
 // This is part of the Message interface implementation.
 func (msg *MsgObject) Decode(r io.Reader) error {
 	var err error
-	msg.ObjectHeader, err = DecodeMsgObjectHeader(r)
+	msg.header, err = DecodeMsgObjectHeader(r)
 	if err != nil {
 		return err
 	}
 
 	msg.payload, err = ioutil.ReadAll(r)
+
+	msg.invHash = nil
 
 	return err
 }
@@ -80,7 +62,7 @@ func (msg *MsgObject) Decode(r io.Reader) error {
 // Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *MsgObject) Encode(w io.Writer) error {
-	err := msg.ObjectHeader.Encode(w)
+	err := msg.header.Encode(w)
 	if err != nil {
 		return err
 	}
@@ -102,16 +84,15 @@ func (msg *MsgObject) MaxPayloadLength() int {
 }
 
 func (msg *MsgObject) String() string {
-	return fmt.Sprintf("object: %s v%d, expires: %s, nonce: %d, stream: %d",
-		msg.ObjectType, msg.Version, msg.ExpiresTime, msg.Nonce, msg.StreamNumber)
+	return msg.header.String()
 }
 
 // Header returns the object header.
 func (msg *MsgObject) Header() *ObjectHeader {
-	return &msg.ObjectHeader
+	return msg.header
 }
 
-// ObjectPayload return the object payload of the message.
+// Payload return the object payload of the message.
 func (msg *MsgObject) Payload() []byte {
 	return msg.payload
 }
@@ -137,6 +118,7 @@ func (msg *MsgObject) Copy() *MsgObject {
 
 	newMsg.payload = make([]byte, len(msg.payload))
 	copy(newMsg.payload, msg.payload)
+	newMsg.header = msg.header
 
 	newMsg.invHash = nil // can be recalculated
 
@@ -145,7 +127,6 @@ func (msg *MsgObject) Copy() *MsgObject {
 
 // DecodeMsgObject takes a byte array and turns it into an object message.
 func DecodeMsgObject(obj []byte) (*MsgObject, error) {
-	// Object is good, so make it MsgObject.
 	msgObj := &MsgObject{}
 	err := msgObj.Decode(bytes.NewReader(obj)) // no error
 	if err != nil {
@@ -156,15 +137,9 @@ func DecodeMsgObject(obj []byte) (*MsgObject, error) {
 
 // NewMsgObject returns a new object message that conforms to the Message
 // interface using the passed parameters and defaults for the remaining fields.
-func NewMsgObject(nonce uint64, expires time.Time, objectType ObjectType, version, streamNumber uint64, payload []byte) *MsgObject {
+func NewMsgObject(header *ObjectHeader, payload []byte) *MsgObject {
 	return &MsgObject{
-		ObjectHeader: ObjectHeader{
-			Nonce:        nonce,
-			ExpiresTime:  expires,
-			ObjectType:   objectType,
-			Version:      version,
-			StreamNumber: streamNumber,
-		},
+		header:  header,
 		payload: payload,
 	}
 }

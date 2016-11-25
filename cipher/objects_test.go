@@ -16,263 +16,191 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 )
 
-var privId1, privId2 *identity.Private
-var encKey1, signKey1, encKey2, signKey2 *wire.PubKey
-
-// Setup everything
-func init() {
-	privId1, _ = identity.ImportWIF("BM-2cXm1jokUVp9Nn1kBtkeMjpxaLJuP3FwET",
-		"5K3oNuMzVEWdrtyBAZXrPQwQTSmCGrAZS1groRDQVGDeccLim15",
-		"5HzhkuimkuizxJyw9b7qnFEMtUrAXD25Y5AV1sZ964dSSXReKnb",
-		pow.DefaultNonceTrialsPerByte, pow.DefaultExtraBytes)
-	encKey1, _ = wire.NewPubKey(privId1.EncryptionKey.PubKey().SerializeUncompressed()[1:])
-	signKey1, _ = wire.NewPubKey(privId1.SigningKey.PubKey().SerializeUncompressed()[1:])
-
-	privId2, _ = identity.ImportWIF("BM-2cTLMh1CufXWQ9co4CWzD9muDZP4a7N4MA",
-		"5Jw6Gtjy8RCZ5BmTtyx3VykzdXvX4WyWsGu2wLrhfTv8zgKfo7C",
-		"5JY8Lsf5cmNTrXXj1e7FkvCZVYgsK7tAiiocTDtVKLBvQm1EsFw",
-		pow.DefaultNonceTrialsPerByte, pow.DefaultExtraBytes)
-	encKey2, _ = wire.NewPubKey(privId2.EncryptionKey.PubKey().SerializeUncompressed()[1:])
-	signKey2, _ = wire.NewPubKey(privId2.SigningKey.PubKey().SerializeUncompressed()[1:])
-
-}
-
 // TestPubKeys tests GeneratePubKey, SignAndEncryptPubKey and
 // TryDecryptAndVerifyPubKey
 func TestPubKeys(t *testing.T) {
 	// GeneratePubKey
 
 	// Version 4 address
-	pkMsg, err := GeneratePubKey(privId1, time.Hour*24)
-	if err != nil {
-		t.Error(err)
-	}
-	if pkMsg.Version != privId1.Address.Version {
-		t.Errorf("For version expected %d got %d", privId1.Address.Version,
-			pkMsg.Version)
-	}
-	err = TryDecryptAndVerifyPubKey(pkMsg, &privId1.Address)
-	if err != nil {
-		t.Error(err)
+	{
+		pk, err := GeneratePubKey(PrivID1, time.Hour*24)
+		if err != nil {
+			t.Error(err)
+		}
+		pkMsg := pk.Object()
+		version := pkMsg.Header().Version
+		if version != PrivID1.Address.Version {
+			t.Errorf("For version expected %d got %d", PrivID1.Address.Version,
+				version)
+		}
+		_, err = TryDecryptAndVerifyPubKey(pkMsg.MsgObject(), &PrivID1.Address)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 
 	// Version 3 address
-	v3ID := *privId1
-	v3ID.Address.Version = 3
-	pkMsg, err = GeneratePubKey(&v3ID, time.Hour*24)
-	if err != nil {
-		t.Error(err)
-	}
-	if pkMsg.Version != 3 {
-		t.Errorf("For version expected %d got %d", privId1.Address.Version,
-			pkMsg.Version)
-	}
-	err = TryDecryptAndVerifyPubKey(pkMsg, &v3ID.Address)
-	if err != nil {
-		t.Error(err)
+	{
+		v3ID := *PrivID1
+		v3ID.Address.Version = 3
+		pk, err := GeneratePubKey(&v3ID, time.Hour*24)
+		if err != nil {
+			t.Error(err)
+		}
+		pkMsg := pk.Object()
+		version := pkMsg.Header().Version
+		if version != 3 {
+			t.Errorf("For version expected %d got %d", PrivID1.Address.Version,
+				version)
+		}
+		pk, err = TryDecryptAndVerifyPubKey(pkMsg.MsgObject(), &v3ID.Address)
+		if err != nil {
+			t.Error(err)
+		}
 	}
 
 	// Version 2 address
-	v2ID := *privId1
-	v2ID.Address.Version = 2
-	pkMsg, err = GeneratePubKey(&v2ID, time.Hour*24)
-	if err != nil {
-		t.Error(err)
-	}
-	if pkMsg.Version != 2 {
-		t.Errorf("For version expected %d got %d", privId1.Address.Version,
-			pkMsg.Version)
-	}
-	if !bytes.Equal(v2ID.SigningKey.PubKey().SerializeUncompressed()[1:],
-		pkMsg.SigningKey[:]) ||
-		!bytes.Equal(v2ID.EncryptionKey.PubKey().SerializeUncompressed()[1:],
-			pkMsg.EncryptionKey[:]) {
-		t.Error("Signing/encryption key mismatch.")
-	}
-
-	// SignAndEncryptPubKey
-
-	tag1, _ := wire.NewShaHash(privId1.Address.Tag())
-	pubkey1 := obj.NewPubKey(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
-		4, 1, 0, signKey1, encKey1, 1000, 1000, nil, tag1, nil)
-
-	err = SignAndEncryptPubKey(pubkey1, privId1)
-	if err != nil {
-		t.Errorf("for SignAndEncryptPubKey got error %v", err)
-	}
-
-	tag2, _ := wire.NewShaHash(privId2.Address.Tag())
-	pubkey2 := obj.NewPubKey(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
-		3, 1, 0, signKey2, encKey2, 1000, 1000, nil, nil, nil)
-	err = SignAndEncryptPubKey(pubkey2, privId2)
-	if err != nil {
-		t.Errorf("for SignAndEncryptPubKey got error %v", err)
-	}
-
-	// Test errors for SignAndEncryptPubKey
-	tests1 := []struct {
-		pubkey *obj.PubKey
-		privId *identity.Private
-	}{
-		// Version lower than wire.ExtendedPubKeyVersion.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 1, 1, 0,
-			signKey1, encKey1, 1000, 1000, nil, tag1, nil), privId1},
-
-		// Version higher than wire.EncryptedPubKeyVersion.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 5, 1, 0,
-			signKey1, encKey1, 1000, 1000, nil, tag1, nil), privId1},
-	}
-
-	for i, test := range tests1 {
-		err = SignAndEncryptPubKey(test.pubkey, test.privId)
-		if err == nil {
-			t.Errorf("for test case #%d didn't get error", i)
+	{
+		v2ID := *PrivID1
+		v2ID.Address.Version = 2
+		pk, err := GeneratePubKey(&v2ID, time.Hour*24)
+		pkMsg := pk.Object()
+		version := pkMsg.Header().Version
+		if err != nil {
+			t.Error(err)
+		}
+		if version != 2 {
+			t.Errorf("For version expected %d got %d", PrivID1.Address.Version,
+				version)
+		}
+		if !bytes.Equal(v2ID.SigningKey.PubKey().SerializeUncompressed()[1:],
+			pk.VerificationKey()[:]) ||
+			!bytes.Equal(v2ID.EncryptionKey.PubKey().SerializeUncompressed()[1:],
+				pk.EncryptionKey()[:]) {
+			t.Error("Signing/encryption key mismatch.")
 		}
 	}
 
 	// TryDecryptAndVerifyPubKey
+	{
+		pubKey1 := TstNewDecryptedPubKey(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+			1, 0, SignKey1, EncKey1, 1000, 1000, nil, Tag1, nil, PrivID1)
 
-	var b bytes.Buffer
-	pubkey1.Encode(&b)
+		var b bytes.Buffer
+		pubKey1.Object().Encode(&b)
 
-	pubkey1Temp := new(obj.PubKey)
-	pubkey1Temp.Decode(bytes.NewReader(b.Bytes()))
-	err = TryDecryptAndVerifyPubKey(pubkey1Temp, &privId1.Address)
-	if err != nil {
-		t.Errorf("for TryDecryptAndVerifyPubKey got error %v", err)
-	}
-	if !reflect.DeepEqual(pubkey1, pubkey1Temp) {
-		t.Errorf("decrypted pubkey not the same as original, got %v want %v",
-			pubkey1Temp, pubkey1)
-	}
-
-	b.Reset()
-	pubkey2.Encode(&b)
-
-	pubkey2Temp := new(obj.PubKey)
-	pubkey2Temp.Decode(bytes.NewReader(b.Bytes()))
-	err = TryDecryptAndVerifyPubKey(pubkey2Temp, &privId1.Address)
-	if err != nil {
-		t.Errorf("for TryDecryptAndVerifyPubKey got error %v", err)
-	}
-	if !reflect.DeepEqual(pubkey2, pubkey2Temp) {
-		t.Errorf("decrypted pubkey not the same as original, got %v want %v",
-			pubkey2Temp, pubkey2)
+		encPubKey1 := new(obj.EncryptedPubKey)
+		encPubKey1.Decode(bytes.NewReader(b.Bytes()))
+		pubKey1Temp, err := TryDecryptAndVerifyPubKey(encPubKey1, &PrivID1.Address)
+		if err != nil {
+			t.Errorf("for TryDecryptAndVerifyPubKey got error %v", err)
+		}
+		if !reflect.DeepEqual(pubKey1, pubKey1Temp) {
+			t.Errorf("decrypted pubkey not the same as original, got %v want %v",
+				pubKey1Temp, pubKey1)
+		}
 	}
 
-	// Test actual encrypted pubkey
+	{
+		pubKey2 := TstNewExtendedPubKey(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+			1, 0, SignKey2, EncKey2, 1000, 1000, PrivID2)
+
+		var b bytes.Buffer
+		pubKey2.Object().Encode(&b)
+
+		encPubKey2 := new(obj.ExtendedPubKey)
+		encPubKey2.Decode(bytes.NewReader(b.Bytes()))
+		pubKey2Temp, err := TryDecryptAndVerifyPubKey(encPubKey2, &PrivID1.Address)
+		if err != nil {
+			t.Errorf("for TryDecryptAndVerifyPubKey got error %v", err)
+		}
+		if !reflect.DeepEqual(pubKey2, pubKey2Temp) {
+			t.Errorf("decrypted pubkey not the same as original, got %v want %v",
+				pubKey2Temp, pubKey2)
+		}
+	}
+
 	addr, _ := bmutil.DecodeAddress("BM-2cTFEueNqmjgR3EqduEZmaZbEW1h9z7M7o")
-	data, _ := hex.DecodeString("00000000025A04D60000000055A4EA7C0000000104017F933D64A866DE24C27D647C74068A59DCEE0CABFC1DF887BE7DD30BA3BD9143D513F0B37087891F6A98DD0B55B1A73E02CA002090CE6A050E760F52D18F7F50B1B9139DBCEF861254C195173AA601DE8A72B52E00206FAF91EDD32E213097CD91E4ACBB883CB2F8CC6AAFCC670DDE1FAC52C210469D71B08A162E07C4B8926A50CC0701594AF55D65052C2D9D74CE28BB571D781423C101BDC8DB6CE3FA639BDDE9CE39364307188470AEC410F7EE2BCC008CA6B1F2A37CF0841FC5EDE154C172438061577FBF3BC6BCDAAAB9BBCC90378DE815A99B0B78D81DFC9ABE33F99B4BC2AFAC2101ED7E0E213C00011FF3583B1E2BAADEF4BED2DB17F340258C22D38F8B490040B94E01F76F2118D90D718FFAFFB7D8F2A9F2B3498D45D528F16BCE55B43E63AAF3AED720F0AC06FCEB853661ACE13714069AA47A3D2FD6180AD0458B344E7AF04A26A25490DCEF236EE29CDF2FD96CDF55EB2B0D4DACA1EC21B4049DB6A6C713A2350D6ECE4C77C01DA01BCAAB2F2CBB31")
-	pubkey := new(obj.PubKey)
-	err = pubkey.Decode(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal("failed to decode pubkey, got error", err)
-	}
+	// Test actual encrypted pubkey
+	{
+		data, _ := hex.DecodeString("00000000025A04D60000000055A4EA7C0000000104017F933D64A866DE24C27D647C74068A59DCEE0CABFC1DF887BE7DD30BA3BD9143D513F0B37087891F6A98DD0B55B1A73E02CA002090CE6A050E760F52D18F7F50B1B9139DBCEF861254C195173AA601DE8A72B52E00206FAF91EDD32E213097CD91E4ACBB883CB2F8CC6AAFCC670DDE1FAC52C210469D71B08A162E07C4B8926A50CC0701594AF55D65052C2D9D74CE28BB571D781423C101BDC8DB6CE3FA639BDDE9CE39364307188470AEC410F7EE2BCC008CA6B1F2A37CF0841FC5EDE154C172438061577FBF3BC6BCDAAAB9BBCC90378DE815A99B0B78D81DFC9ABE33F99B4BC2AFAC2101ED7E0E213C00011FF3583B1E2BAADEF4BED2DB17F340258C22D38F8B490040B94E01F76F2118D90D718FFAFFB7D8F2A9F2B3498D45D528F16BCE55B43E63AAF3AED720F0AC06FCEB853661ACE13714069AA47A3D2FD6180AD0458B344E7AF04A26A25490DCEF236EE29CDF2FD96CDF55EB2B0D4DACA1EC21B4049DB6A6C713A2350D6ECE4C77C01DA01BCAAB2F2CBB31")
+		pubkey, err := obj.DecodePubKey(bytes.NewReader(data))
+		if err != nil {
+			t.Fatal("failed to decode pubkey, got error", err)
+		}
 
-	err = TryDecryptAndVerifyPubKey(pubkey, addr)
-	if err != nil {
-		t.Errorf("failed to decrypt pubkey, got error %v", err)
+		_, err = TryDecryptAndVerifyPubKey(pubkey, addr)
+		if err != nil {
+			t.Errorf("failed to decrypt pubkey, got error %v", err)
+		}
 	}
 
 	// Test actual unencrypted pubkey
-	data, _ = hex.DecodeString("0000000001FB575F000000005581B73A00000001030100000001520A752F43BD36DA5BD2C77FDB7E53C597EB21BDA6BD08A80AC2F4ACC3D885DE19945F02D6D18A655FD831F071B6224E0F145F7C3138BE07DB7C4C9C8BD234DD8333DA6BA201B9893982B28B740AB6252E3A146677A1EDE15F567F15D8E8C83EAD7547AC132D008418330810243A43DBCF2DD39C5283913ED6BD6C1A3B468271FD03E8FD03E8473045022100AB37F26D1709E43FD24852273033D97764F2498E170422EDC6775FADE21F7A9502206FEB2527BBCAF77E7D07BAF6FCD2F4ED49B8B4D1C3FCE7DEB6149D7E9DF3CD95")
-	pubkey = new(obj.PubKey)
-	err = pubkey.Decode(bytes.NewReader(data))
-	if err != nil {
-		t.Fatal("failed to decode pubkey, got error", err)
-	}
+	{
+		data, _ := hex.DecodeString("0000000001FB575F000000005581B73A00000001030100000001520A752F43BD36DA5BD2C77FDB7E53C597EB21BDA6BD08A80AC2F4ACC3D885DE19945F02D6D18A655FD831F071B6224E0F145F7C3138BE07DB7C4C9C8BD234DD8333DA6BA201B9893982B28B740AB6252E3A146677A1EDE15F567F15D8E8C83EAD7547AC132D008418330810243A43DBCF2DD39C5283913ED6BD6C1A3B468271FD03E8FD03E8473045022100AB37F26D1709E43FD24852273033D97764F2498E170422EDC6775FADE21F7A9502206FEB2527BBCAF77E7D07BAF6FCD2F4ED49B8B4D1C3FCE7DEB6149D7E9DF3CD95")
+		pubkey, err := obj.DecodePubKey(bytes.NewReader(data))
+		if err != nil {
+			t.Fatal("failed to decode pubkey, got error", err)
+		}
 
-	err = TryDecryptAndVerifyPubKey(pubkey, nil)
-	if err != nil {
-		t.Errorf("failed to verify pubkey, got error %v", err)
+		_, err = TryDecryptAndVerifyPubKey(pubkey, addr)
+		if err != nil {
+			t.Errorf("failed to verify pubkey, got error %v", err)
+		}
 	}
 
 	// Test errors for TryDecryptAndVerifyPubKey
 
 	randId, _ := btcec.NewPrivateKey(btcec.S256())
 	invDec, _ := btcec.Encrypt(randId.PubKey(), []byte{0x00})
-	undecData, _ := btcec.Encrypt(privId1.Address.PrivateKey().PubKey(),
+	undecData, _ := btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
 		[]byte{0x00})
-	validPubkey, _ := wire.NewPubKey(randId.PubKey().SerializeUncompressed()[1:])
+	validPubKey, _ := wire.NewPubKey(randId.PubKey().SerializeUncompressed()[1:])
 
-	b.Reset()
-	attackPub := new(obj.PubKey)
-	attackPub.EncryptionKey = validPubkey
-	attackPub.SigningKey = validPubkey
-	attackPub.EncodeForEncryption(&b)
-	forwardingData, _ := btcec.Encrypt(privId1.Address.PrivateKey().PubKey(),
-		b.Bytes())
-
-	b.Reset()
-	attackPub.EncryptionKey, _ = wire.NewPubKey(privId1.EncryptionKey.PubKey().SerializeUncompressed()[1:])
-	attackPub.SigningKey, _ = wire.NewPubKey(privId1.SigningKey.PubKey().SerializeUncompressed()[1:])
-	attackPub.Signature = []byte{0x00}
-	attackPub.EncodeForEncryption(&b)
-	invalidSig, _ := btcec.Encrypt(privId1.Address.PrivateKey().PubKey(),
-		b.Bytes())
-
-	b.Reset()
-	attackPub.EncodeForSigning(&b)
-	// should actually be hash
-	sig, _ := privId1.EncryptionKey.Sign(b.Bytes())
-	attackPub.Signature = sig.Serialize()
-	b.Reset()
-	attackPub.EncodeForEncryption(&b)
-	mismatchSig, _ := btcec.Encrypt(privId1.Address.PrivateKey().PubKey(),
-		b.Bytes())
+	forwardingData := TstGenerateForwardingData(validPubKey)
+	invalidSig := TstGenerateInvalidSig()
+	mismatchSig := TstGenerateMismatchSig()
 
 	tests2 := []struct {
-		pubkey  *obj.PubKey
+		pubkey  obj.Object
 		address *bmutil.Address
 	}{
-		// Version lower than wire.ExtendedPubKeyVersion.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 1, 1, 0, nil, nil,
-			1000, 1000, nil, tag1, nil), &privId1.Address},
-
-		// Version higher than wire.EncryptedPubKeyVersion.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 5, 1, 0, nil, nil,
-			1000, 1000, nil, tag1, nil), &privId1.Address},
-
 		// Invalid tag.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 4, 1, 0, nil, nil,
-			1000, 1000, nil, tag2, nil), &privId1.Address},
+		{obj.NewEncryptedPubKey(0, time.Now().Add(time.Minute*5), 1, Tag2, nil), &PrivID1.Address},
 
 		// Invalid decryption key.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 4, 1, 0, nil, nil,
-			1000, 1000, nil, tag1, invDec), &privId1.Address},
+		{obj.NewEncryptedPubKey(0, time.Now().Add(time.Minute*5), 1, Tag1, invDec), &PrivID1.Address},
 
 		// Decryption failure.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 4, 1, 0, nil, nil,
-			1000, 1000, nil, tag1, []byte{0x00, 0x00}), &privId1.Address},
+		{obj.NewEncryptedPubKey(0, time.Now().Add(time.Minute*5), 1, Tag1, []byte{0x00, 0x00}), &PrivID1.Address},
 
 		// Undecodable decrypted data.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 4, 1, 0, nil, nil,
-			1000, 1000, nil, tag1, undecData), &privId1.Address},
+		{obj.NewEncryptedPubKey(0, time.Now().Add(time.Minute*5), 1, Tag1, undecData), &PrivID1.Address},
 
 		// Invalid embedded signing key.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 3, 1, 0,
-			&wire.PubKey{}, nil, 1000, 1000, nil, tag2, nil), &privId1.Address},
+		{obj.NewExtendedPubKey(0, time.Now().Add(time.Minute*5), 1, 0,
+			&wire.PubKey{}, nil, &pow.Data{1000, 1000}, nil), &PrivID1.Address},
 
 		// Invalid embedded encryption key.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 3, 1, 0,
-			validPubkey, &wire.PubKey{}, 1000, 1000, nil, tag2, nil),
-			&privId1.Address},
+		{obj.NewExtendedPubKey(0, time.Now().Add(time.Minute*5), 1, 0,
+			validPubKey, &wire.PubKey{}, &pow.Data{1000, 1000}, nil),
+			&PrivID1.Address},
 
 		// Surreptitous forwarding attack.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 4, 1, 0, nil, nil,
-			1000, 1000, nil, tag1, forwardingData), &privId1.Address},
+		{obj.NewEncryptedPubKey(0, time.Now().Add(time.Minute*5), 1, Tag1, forwardingData), &PrivID1.Address},
 
 		// Invalid signature.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 4, 1, 0, nil, nil,
-			1000, 1000, nil, tag1, invalidSig), &privId1.Address},
+		{obj.NewEncryptedPubKey(0, time.Now().Add(time.Minute*5), 1, Tag1, invalidSig), &PrivID1.Address},
 
 		// Signature mismatch.
-		{obj.NewPubKey(0, time.Now().Add(time.Minute*5), 4, 1, 0, nil, nil,
-			1000, 1000, nil, tag1, mismatchSig), &privId1.Address},
+		{obj.NewEncryptedPubKey(0, time.Now().Add(time.Minute*5), 1, Tag1, mismatchSig), &PrivID1.Address},
 	}
 
 	for i, test := range tests2 {
-		err = TryDecryptAndVerifyPubKey(test.pubkey, test.address)
+		if test.pubkey == nil {
+			t.Fatalf("test case #%d is nil.", i)
+		}
+		_, err := TryDecryptAndVerifyPubKey(test.pubkey, test.address)
 		if err == nil {
 			t.Errorf("for test case #%d didn't get error", i)
 		}
@@ -284,21 +212,21 @@ func TestBroadcasts(t *testing.T) {
 	// SignAndEncryptBroadcast
 
 	// v5 broadcast
-	tag1, _ := wire.NewShaHash(privId1.Address.Tag())
+	tag1, _ := wire.NewShaHash(PrivID1.Address.Tag())
 	broadcast1 := obj.NewBroadcast(0, time.Now().Add(time.Minute*5).
-		Truncate(time.Second), 5, 1, tag1, nil, 4, 1, 1, signKey1, encKey1,
+		Truncate(time.Second), 5, 1, tag1, nil, 4, 1, 1, SignKey1, EncKey1,
 		1000, 1000, 1, []byte("Hey there!"), nil)
 
-	err := SignAndEncryptBroadcast(broadcast1, privId1)
+	err := SignAndEncryptBroadcast(broadcast1, PrivID1)
 	if err != nil {
 		t.Errorf("for SignAndEncryptBroadcast got error %v", err)
 	}
 
 	// v4 broadcast
 	broadcast2 := obj.NewBroadcast(0, time.Now().Add(time.Minute*5).
-		Truncate(time.Second), 4, 1, nil, nil, 3, 1, 1, signKey1, encKey1,
+		Truncate(time.Second), 4, 1, nil, nil, 3, 1, 1, SignKey1, EncKey1,
 		1000, 1000, 1, []byte("Hey there!"), nil)
-	broadcast2ID := *privId1
+	broadcast2ID := *PrivID1
 	broadcast2ID.Address.Version = 3
 
 	err = SignAndEncryptBroadcast(broadcast2, &broadcast2ID)
@@ -342,7 +270,7 @@ func TestBroadcasts(t *testing.T) {
 
 	broadcast1Temp := new(obj.Broadcast)
 	broadcast1Temp.Decode(bytes.NewReader(b.Bytes()))
-	err = TryDecryptAndVerifyBroadcast(broadcast1Temp, &privId1.Address)
+	err = TryDecryptAndVerifyBroadcast(broadcast1Temp, &PrivID1.Address)
 	if err != nil {
 		t.Errorf("for TryDecryptAndVerifyBroadcast got error %v", err)
 	}
@@ -397,23 +325,24 @@ func TestBroadcasts(t *testing.T) {
 	// Test errors for TryDecryptAndVerifyBroadcast
 
 	randId, _ := btcec.NewPrivateKey(btcec.S256())
-	undecData, _ := btcec.Encrypt(privId1.Address.PrivateKey().PubKey(),
+	undecData, _ := btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
 		[]byte{0x00, 0x00})
 	validPubkey, _ := wire.NewPubKey(randId.PubKey().SerializeUncompressed()[1:])
 
 	b.Reset()
-	attackB := new(obj.Broadcast)
+	attackB := obj.NewBroadcast(0, time.Now().Add(time.Minute*5).
+		Truncate(time.Second), 5, 1, tag1, nil, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
 	attackB.SigningKey = &wire.PubKey{}
 	attackB.EncryptionKey = validPubkey
 	attackB.EncodeForEncryption(&b)
-	invSigningKey, _ := btcec.Encrypt(privId1.Address.PrivateKey().PubKey(),
+	invSigningKey, _ := btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
 		b.Bytes())
 
 	b.Reset()
 	attackB.EncryptionKey = &wire.PubKey{}
 	attackB.SigningKey = validPubkey
 	attackB.EncodeForEncryption(&b)
-	invEncKey, _ := btcec.Encrypt(privId1.Address.PrivateKey().PubKey(),
+	invEncKey, _ := btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
 		b.Bytes())
 
 	b.Reset()
@@ -422,25 +351,25 @@ func TestBroadcasts(t *testing.T) {
 	attackB.FromAddressVersion = 4
 	attackB.FromStreamNumber = 1
 	attackB.EncodeForEncryption(&b)
-	forwardingData, _ := btcec.Encrypt(privId1.Address.PrivateKey().PubKey(),
+	forwardingData, _ := btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
 		b.Bytes())
 
 	b.Reset()
-	attackB.EncryptionKey, _ = wire.NewPubKey(privId1.EncryptionKey.PubKey().SerializeUncompressed()[1:])
-	attackB.SigningKey, _ = wire.NewPubKey(privId1.SigningKey.PubKey().SerializeUncompressed()[1:])
+	attackB.EncryptionKey, _ = wire.NewPubKey(PrivID1.EncryptionKey.PubKey().SerializeUncompressed()[1:])
+	attackB.SigningKey, _ = wire.NewPubKey(PrivID1.SigningKey.PubKey().SerializeUncompressed()[1:])
 	attackB.Signature = []byte{0x00}
 	attackB.EncodeForEncryption(&b)
-	invalidSig, _ := btcec.Encrypt(privId1.Address.PrivateKey().PubKey(),
+	invalidSig, _ := btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
 		b.Bytes())
 
 	b.Reset()
 	attackB.EncodeForSigning(&b)
 	// should actually be hash
-	sig, _ := privId1.EncryptionKey.Sign(b.Bytes())
+	sig, _ := PrivID1.EncryptionKey.Sign(b.Bytes())
 	attackB.Signature = sig.Serialize()
 	b.Reset()
 	attackB.EncodeForEncryption(&b)
-	mismatchSig, _ := btcec.Encrypt(privId1.Address.PrivateKey().PubKey(),
+	mismatchSig, _ := btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
 		b.Bytes())
 
 	tests2 := []struct {
@@ -456,45 +385,45 @@ func TestBroadcasts(t *testing.T) {
 			3, 1, 1, nil, nil, 1000, 1000, 1, nil, nil), nil},
 
 		// Invalid tag.
-		{broadcast1, &privId2.Address},
+		{broadcast1, &PrivID2.Address},
 
 		// Invalid address.
-		{broadcast2, &privId2.Address},
+		{broadcast2, &PrivID2.Address},
 
 		// Decryption failure.
 		{obj.NewBroadcast(0, time.Now().Add(time.Minute*5), 4, 1, nil,
 			[]byte{0x00, 0x00}, 3, 1, 1, nil, nil, 1000, 1000, 1, nil, nil),
-			&privId1.Address},
+			&PrivID1.Address},
 
 		// Undecodable decrypted data.
 		{obj.NewBroadcast(0, time.Now().Add(time.Minute*5), 5, 1, tag1,
 			undecData, 4, 1, 1, nil, nil, 1000, 1000, 1, nil, nil),
-			&privId1.Address},
+			&PrivID1.Address},
 
 		// Invalid embedded signing key.
 		{obj.NewBroadcast(0, time.Now().Add(time.Minute*5), 5, 1, tag1,
 			invSigningKey, 4, 1, 1, nil, nil, 1000, 1000, 1, nil, nil),
-			&privId1.Address},
+			&PrivID1.Address},
 
 		// Invalid embedded encryption key.
 		{obj.NewBroadcast(0, time.Now().Add(time.Minute*5), 5, 1, tag1,
 			invEncKey, 4, 1, 1, nil, nil, 1000, 1000, 1, nil, nil),
-			&privId1.Address},
+			&PrivID1.Address},
 
 		// Surreptitous forwarding attack.
 		{obj.NewBroadcast(0, time.Now().Add(time.Minute*5), 5, 1, tag1,
 			forwardingData, 4, 1, 1, nil, nil, 1000, 1000, 1, nil, nil),
-			&privId1.Address},
+			&PrivID1.Address},
 
 		// Invalid signature.
 		{obj.NewBroadcast(0, time.Now().Add(time.Minute*5), 5, 1, tag1,
 			invalidSig, 4, 1, 1, nil, nil, 1000, 1000, 1, nil, nil),
-			&privId1.Address},
+			&PrivID1.Address},
 
 		// Signature mismatch.
 		{obj.NewBroadcast(0, time.Now().Add(time.Minute*5), 5, 1, tag1,
 			mismatchSig, 4, 1, 1, nil, nil, 1000, 1000, 1, nil, nil),
-			&privId1.Address},
+			&PrivID1.Address},
 	}
 
 	for i, test := range tests2 {
@@ -508,13 +437,12 @@ func TestBroadcasts(t *testing.T) {
 func TestMessages(t *testing.T) {
 
 	// SignAndEncryptMsg
-
-	destRipe, _ := wire.NewRipeHash(privId2.Address.Ripe[:])
+	destRipe, _ := wire.NewRipeHash(PrivID2.Address.Ripe[:])
 	msg := obj.NewMessage(0, time.Now().Add(time.Minute*5).
-		Truncate(time.Second), 1, 1, nil, 4, 1, 1, signKey1, encKey1, 1000,
+		Truncate(time.Second), 1, 1, nil, 4, 1, 1, SignKey1, EncKey1, 1000,
 		1000, destRipe, 1, []byte("Hey there!"), []byte{}, nil)
 
-	err := SignAndEncryptMsg(msg, privId1, privId2.ToPublic())
+	err := SignAndEncryptMsg(msg, PrivID1, PrivID2.ToPublic())
 	if err != nil {
 		t.Errorf("for SignAndEncryptMsg got error %v", err)
 	}
@@ -544,7 +472,7 @@ func TestMessages(t *testing.T) {
 
 	msgTemp := new(obj.Message)
 	msgTemp.Decode(bytes.NewReader(b.Bytes()))
-	err = TryDecryptAndVerifyMsg(msgTemp, privId2)
+	err = TryDecryptAndVerifyMsg(msgTemp, PrivID2)
 	if err != nil {
 		t.Errorf("for TryDecryptAndVerifyMsg got error %v", err)
 	}
@@ -561,7 +489,7 @@ func TestMessages(t *testing.T) {
 		t.Fatal("failed to decode msg, got error", err)
 	}
 
-	err = TryDecryptAndVerifyMsg(msg, privId2)
+	err = TryDecryptAndVerifyMsg(msg, PrivID2)
 	if err != nil {
 		t.Errorf("failed to decrypt msg, got error %v", err)
 	}
@@ -570,42 +498,43 @@ func TestMessages(t *testing.T) {
 
 	randId, _ := btcec.NewPrivateKey(btcec.S256())
 	invPrivID, _ := btcec.Encrypt(randId.PubKey(), []byte{0x00, 0x00})
-	undecData, _ := btcec.Encrypt(privId1.EncryptionKey.PubKey(),
+	undecData, _ := btcec.Encrypt(PrivID1.EncryptionKey.PubKey(),
 		[]byte{0x00, 0x00})
 	validPubkey, _ := wire.NewPubKey(randId.PubKey().SerializeUncompressed()[1:])
 
 	b.Reset()
-	attackB := new(obj.Message)
+	attackB := obj.NewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second), 1, 1,
+		nil, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
 	attackB.SigningKey = &wire.PubKey{}
 	attackB.EncryptionKey = &wire.PubKey{}
 	attackB.Message = []byte{}
 	attackB.Ack = []byte{}
 	attackB.Destination = &wire.RipeHash{}
 	attackB.EncodeForEncryption(&b)
-	invDest, _ := btcec.Encrypt(privId1.EncryptionKey.PubKey(), b.Bytes())
+	invDest, _ := btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
 
 	b.Reset()
 	attackB.SigningKey = &wire.PubKey{}
 	attackB.EncryptionKey = validPubkey
-	attackB.Destination, _ = wire.NewRipeHash(privId1.Address.Ripe[:])
+	attackB.Destination, _ = wire.NewRipeHash(PrivID1.Address.Ripe[:])
 	attackB.EncodeForEncryption(&b)
-	invSigningKey, _ := btcec.Encrypt(privId1.EncryptionKey.PubKey(), b.Bytes())
+	invSigningKey, _ := btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
 
 	b.Reset()
-	attackB.EncryptionKey, _ = wire.NewPubKey(privId2.EncryptionKey.PubKey().SerializeUncompressed()[1:])
-	attackB.SigningKey, _ = wire.NewPubKey(privId2.SigningKey.PubKey().SerializeUncompressed()[1:])
+	attackB.EncryptionKey, _ = wire.NewPubKey(PrivID2.EncryptionKey.PubKey().SerializeUncompressed()[1:])
+	attackB.SigningKey, _ = wire.NewPubKey(PrivID2.SigningKey.PubKey().SerializeUncompressed()[1:])
 	attackB.Signature = []byte{0x00}
 	attackB.EncodeForEncryption(&b)
-	invalidSig, _ := btcec.Encrypt(privId1.EncryptionKey.PubKey(), b.Bytes())
+	invalidSig, _ := btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
 
 	b.Reset()
 	attackB.EncodeForSigning(&b)
 	// should actually be hash
-	sig, _ := privId1.EncryptionKey.Sign(b.Bytes())
+	sig, _ := PrivID1.EncryptionKey.Sign(b.Bytes())
 	attackB.Signature = sig.Serialize()
 	b.Reset()
 	attackB.EncodeForEncryption(&b)
-	mismatchSig, _ := btcec.Encrypt(privId1.EncryptionKey.PubKey(), b.Bytes())
+	mismatchSig, _ := btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
 
 	tests2 := []struct {
 		msg    *obj.Message
@@ -619,37 +548,37 @@ func TestMessages(t *testing.T) {
 		// Invalid private identity.
 		{obj.NewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 			1, 1, invPrivID, 4, 1, 1, nil, nil, 1000, 1000,
-			nil, 1, nil, nil, nil), privId1},
+			nil, 1, nil, nil, nil), PrivID1},
 
 		// Decryption failure.
 		{obj.NewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 			1, 1, []byte{0x00, 0x00}, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
-			nil, nil, nil), privId1},
+			nil, nil, nil), PrivID1},
 
 		// Undecodable decrypted data.
 		{obj.NewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 			1, 1, undecData, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
-			nil, nil, nil), privId1},
+			nil, nil, nil), PrivID1},
 
 		// Invalid destination ripe.
 		{obj.NewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 			1, 1, invDest, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
-			nil, nil, nil), privId1},
+			nil, nil, nil), PrivID1},
 
 		// Invalid embedded signing key.
 		{obj.NewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 			1, 1, invSigningKey, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
-			nil, nil, nil), privId1},
+			nil, nil, nil), PrivID1},
 
 		// Invalid signature.
 		{obj.NewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 			1, 1, invalidSig, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
-			nil, nil, nil), privId1},
+			nil, nil, nil), PrivID1},
 
 		// Signature mismatch.
 		{obj.NewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 			1, 1, mismatchSig, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
-			nil, nil, nil), privId1},
+			nil, nil, nil), PrivID1},
 	}
 
 	for i, test := range tests2 {

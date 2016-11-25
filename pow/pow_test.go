@@ -120,8 +120,11 @@ func TestCheck(t *testing.T) {
 		}
 
 		// change nonce
-		msg.Nonce = 0x00
-		if pow.Check(msg, nonceTrials, extraBytes, refTime) {
+		header := msg.Header()
+		header.Nonce = 0x00
+		newMsg := wire.NewMsgObject(header, msg.Payload())
+
+		if pow.Check(newMsg, nonceTrials, extraBytes, refTime) {
 			t.Errorf("for test #%d check returned true", n)
 		}
 	}

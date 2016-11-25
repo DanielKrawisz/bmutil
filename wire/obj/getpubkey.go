@@ -25,27 +25,27 @@ const (
 // public key. If Version <= TagGetPubKeyVersion, tag is encoded in message and
 // not ripe.
 type GetPubKey struct {
-	wire.ObjectHeader
-	Ripe *wire.RipeHash
-	Tag  *wire.ShaHash
+	header *wire.ObjectHeader
+	Ripe   *wire.RipeHash
+	Tag    *wire.ShaHash
 }
 
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *GetPubKey) Decode(r io.Reader) error {
 	var err error
-	msg.ObjectHeader, err = wire.DecodeMsgObjectHeader(r)
+	msg.header, err = wire.DecodeMsgObjectHeader(r)
 	if err != nil {
 		return err
 	}
 
-	if msg.ObjectType != wire.ObjectTypeGetPubKey {
+	if msg.header.ObjectType != wire.ObjectTypeGetPubKey {
 		str := fmt.Sprintf("Object Type should be %d, but is %d",
-			wire.ObjectTypeGetPubKey, msg.ObjectType)
+			wire.ObjectTypeGetPubKey, msg.header.ObjectType)
 		return wire.NewMessageError("Decode", str)
 	}
 
-	switch msg.Version {
+	switch msg.header.Version {
 	case TagGetPubKeyVersion:
 		msg.Tag, _ = wire.NewShaHash(make([]byte, wire.HashSize))
 		if err = wire.ReadElement(r, msg.Tag); err != nil {
@@ -64,7 +64,7 @@ func (msg *GetPubKey) Decode(r io.Reader) error {
 }
 
 func (msg *GetPubKey) encodePayload(w io.Writer) (err error) {
-	switch msg.Version {
+	switch msg.header.Version {
 	case TagGetPubKeyVersion:
 		if err = wire.WriteElement(w, msg.Tag); err != nil {
 			return err
@@ -83,7 +83,7 @@ func (msg *GetPubKey) encodePayload(w io.Writer) (err error) {
 // Encode encodes the receiver to w using the bitmessage protocol encoding.
 // This is part of the Message interface implementation.
 func (msg *GetPubKey) Encode(w io.Writer) error {
-	err := msg.ObjectHeader.Encode(w)
+	err := msg.header.Encode(w)
 	if err != nil {
 		return err
 	}
@@ -98,12 +98,14 @@ func (msg *GetPubKey) MaxPayloadLength() int {
 }
 
 func (msg *GetPubKey) String() string {
-	return fmt.Sprintf("getpubkey: v%d %d %s %d %x %x", msg.Version, msg.Nonce, msg.ExpiresTime, msg.StreamNumber, msg.Ripe, msg.Tag)
+	return fmt.Sprintf("getpubkey: v%d %d %s %d %x %x",
+		msg.header.Version, msg.header.Nonce, msg.header.ExpiresTime,
+		msg.header.StreamNumber, msg.Ripe, msg.Tag)
 }
 
 // Header returns the object header.
 func (msg *GetPubKey) Header() *wire.ObjectHeader {
-	return &msg.ObjectHeader
+	return msg.header
 }
 
 // Payload return the object payload of the message.
@@ -115,11 +117,10 @@ func (msg *GetPubKey) Payload() []byte {
 
 // MsgObject transforms the PubKeyObject to a *MsgObject.
 func (msg *GetPubKey) MsgObject() *wire.MsgObject {
-	return wire.NewMsgObject(msg.ObjectHeader.Nonce,
-		msg.ObjectHeader.ExpiresTime, msg.ObjectHeader.ObjectType,
-		msg.ObjectHeader.Version, msg.ObjectHeader.StreamNumber, msg.Payload())
+	return wire.NewMsgObject(msg.header, msg.Payload())
 }
 
+// InventoryHash returns the inv hash of the message.
 func (msg *GetPubKey) InventoryHash() *wire.ShaHash {
 	return msg.MsgObject().InventoryHash()
 }
@@ -133,7 +134,7 @@ func NewGetPubKey(nonce uint64, expires time.Time, version, streamNumber uint64,
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
 	return &GetPubKey{
-		ObjectHeader: wire.ObjectHeader{
+		header: &wire.ObjectHeader{
 			Nonce:        nonce,
 			ExpiresTime:  expires,
 			ObjectType:   wire.ObjectTypeGetPubKey,

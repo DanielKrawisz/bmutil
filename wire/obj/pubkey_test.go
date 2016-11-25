@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/fixed"
 	"github.com/DanielKrawisz/bmutil/wire/obj"
@@ -21,21 +22,28 @@ import (
 // TestPubKey tests the MsgPubKey API.
 func TestPubKey(t *testing.T) {
 
-	// Ensure the command is expected value.
 	now := time.Now()
-	msg := obj.NewPubKey(83928, now, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
+	tests := []wire.Message{
+		obj.NewSimplePubKey(83928, now, 1, 0, pubKey1, pubKey2),
+		obj.NewExtendedPubKey(83928, now, 1, 0, pubKey1, pubKey2, &pow.Data{0, 0}, []byte{0, 0, 0}),
+		obj.NewEncryptedPubKey(83928, now, 1, tag, []byte{1, 1, 1}),
+	}
 
 	// Ensure max payload is expected value for latest protocol version.
 	wantPayload := wire.MaxPayloadOfMsgObject
-	maxPayload := msg.MaxPayloadLength()
-	if maxPayload != wantPayload {
-		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"- got %v, want %v", maxPayload, wantPayload)
-	}
 
-	str := msg.String()
-	if str[:6] != "pubkey" {
-		t.Errorf("String representation: got %v, want %v", str[:6], "pubkey")
+	for _, test := range tests {
+		maxPayload := test.MaxPayloadLength()
+		if maxPayload != wantPayload {
+			t.Errorf("MaxPayloadLength: wrong max payload length for "+
+				"- got %v, want %v", maxPayload, wantPayload)
+		}
+
+		// Ensure the command is expected value.
+		cmd := test.Command()
+		if cmd != "object" {
+			t.Errorf("Wrong command returned: got %v, want %v", cmd, "object")
+		}
 	}
 
 	return
@@ -47,35 +55,39 @@ func TestPubKeyWire(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	sig := make([]byte, 64)
 	encrypted := make([]byte, 512)
-	msgBase := obj.NewPubKey(83928, expires, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
-	msgExpanded := obj.NewPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
+	msgBase := obj.NewSimplePubKey(83928, expires, 1, 0, pubKey1, pubKey2)
+	msgExpanded := obj.NewExtendedPubKey(83928, expires, 1, 0, pubKey1, pubKey2, &pow.Data{0, 0}, sig)
 	tagBytes := make([]byte, 32)
 	tagBytes[0] = 1
 	tag, err := wire.NewShaHash(tagBytes)
 	if err != nil {
 		t.Fatalf("could not make a tag hash %s", err)
 	}
-	msgEncrypted := obj.NewPubKey(83928, expires, 4, 1, 0, nil, nil, 0, 0, nil, tag, encrypted)
+	msgEncrypted := obj.NewEncryptedPubKey(83928, expires, 1, tag, encrypted)
 
 	tests := []struct {
-		in  *obj.PubKey // Message to encode
-		out *obj.PubKey // Expected decoded message
-		buf []byte      // Wire encoding
+		in   obj.Object // Message to encode
+		out  obj.Object // Expected decoded message
+		base obj.Object // Object to use to decode it.
+		buf  []byte     // Wire encoding
 	}{
 		// Latest protocol version with multiple object vectors.
 		{
 			msgBase,
 			msgBase,
+			&obj.SimplePubKey{},
 			basePubKeyEncoded,
 		},
 		{
 			msgExpanded,
 			msgExpanded,
+			&obj.ExtendedPubKey{},
 			expandedPubKeyEncoded,
 		},
 		{
 			msgEncrypted,
 			msgEncrypted,
+			&obj.EncryptedPubKey{},
 			encryptedPubKeyEncoded,
 		},
 	}
@@ -96,16 +108,15 @@ func TestPubKeyWire(t *testing.T) {
 		}
 
 		// Decode the message from wire.format.
-		var msg obj.PubKey
 		rbuf := bytes.NewReader(test.buf)
-		err = msg.Decode(rbuf)
+		err = test.base.Decode(rbuf)
 		if err != nil {
 			t.Errorf("Decode #%d error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(&msg, test.out) {
+		if !reflect.DeepEqual(test.base, test.out) {
 			t.Errorf("Decode #%d\n got: %s want: %s", i,
-				spew.Sdump(msg), spew.Sdump(test.out))
+				spew.Sdump(test.base), spew.Sdump(test.out))
 			continue
 		}
 	}
@@ -119,41 +130,38 @@ func TestPubKeyWireError(t *testing.T) {
 	copy(wrongObjectTypeEncoded, basePubKeyEncoded)
 	wrongObjectTypeEncoded[19] = 0
 
+	basePubKey := obj.TstBasePubKey(pubKey1, pubKey2)
+	expandedPubKey := obj.TstExpandedPubKey(pubKey1, pubKey2)
+	encryptedPubKey := obj.TstEncryptedPubKey(tag)
+
 	tests := []struct {
-		in       *obj.PubKey // Value to encode
-		buf      []byte      // Wire encoding
-		max      int         // Max size of fixed buffer to induce errors
-		writeErr error       // Expected write error
-		readErr  error       // Expected read error
+		base     obj.Object // Value to decode
+		in       obj.Object // Value to encode
+		buf      []byte     // Wire encoding
+		max      int        // Max size of fixed buffer to induce errors
+		writeErr error      // Expected write error
+		readErr  error      // Expected read error
 	}{
 		// Force error in nonce
-		{basePubKey, basePubKeyEncoded, 0, io.ErrShortWrite, io.EOF},
+		{&obj.SimplePubKey{}, basePubKey, basePubKeyEncoded, 0, io.ErrShortWrite, io.EOF},
 		// Force error in expirestime.
-		{basePubKey, basePubKeyEncoded, 8, io.ErrShortWrite, io.EOF},
+		{&obj.SimplePubKey{}, basePubKey, basePubKeyEncoded, 8, io.ErrShortWrite, io.EOF},
 		// Force error in object type.
-		{basePubKey, basePubKeyEncoded, 16, io.ErrShortWrite, io.EOF},
+		{&obj.SimplePubKey{}, basePubKey, basePubKeyEncoded, 16, io.ErrShortWrite, io.EOF},
 		// Force error in version.
-		{basePubKey, basePubKeyEncoded, 20, io.ErrShortWrite, io.EOF},
+		{&obj.SimplePubKey{}, basePubKey, basePubKeyEncoded, 20, io.ErrShortWrite, io.EOF},
 		// Force error in stream number.
-		{basePubKey, basePubKeyEncoded, 21, io.ErrShortWrite, io.EOF},
+		{&obj.SimplePubKey{}, basePubKey, basePubKeyEncoded, 21, io.ErrShortWrite, io.EOF},
 		// Force error object type validation.
-		{basePubKey, wrongObjectTypeEncoded, 52, io.ErrShortWrite, wireErr},
-		// Force error in version validation
-		{invalidPubKeyVersion, invalidPubKeyVersionEncoded, 22, wireErr, wireErr},
+		{&obj.SimplePubKey{}, basePubKey, wrongObjectTypeEncoded, 52, io.ErrShortWrite, wireErr},
 		// Force error in Tag
-		{basePubKey, encryptedPubKeyEncoded, 22, io.ErrShortWrite, io.EOF},
-		// Force error in Pub Key
-		{basePubKey, expandedPubKeyEncoded, 26, io.ErrShortWrite, io.EOF},
-		// Force error in Nonce Trials
-		{expandedPubKey, expandedPubKeyEncoded, 154, io.ErrShortWrite, io.EOF},
-		// Force error in Extra Bytes
-		{expandedPubKey, expandedPubKeyEncoded, 155, io.ErrShortWrite, io.EOF},
+		{&obj.EncryptedPubKey{}, basePubKey, encryptedPubKeyEncoded, 22, io.ErrShortWrite, io.EOF},
 		// Force error in Sig Length
-		{expandedPubKey, expandedPubKeyEncoded, 156, io.ErrShortWrite, io.EOF},
+		{&obj.ExtendedPubKey{}, expandedPubKey, expandedPubKeyEncoded, 156, io.ErrShortWrite, io.EOF},
 		// Force error in writing tag
-		{encryptedPubKey, basePubKeyEncoded, 22, io.ErrShortWrite, io.EOF},
+		{&obj.SimplePubKey{}, encryptedPubKey, basePubKeyEncoded, 22, io.ErrShortWrite, io.EOF},
 		// Force error in writing tag
-		{expandedPubKey, basePubKeyEncoded, 22, io.ErrShortWrite, io.EOF},
+		{&obj.SimplePubKey{}, expandedPubKey, basePubKeyEncoded, 22, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -179,9 +187,8 @@ func TestPubKeyWireError(t *testing.T) {
 		}
 
 		// Decode from wire.format.
-		var msg obj.PubKey
 		buf := bytes.NewBuffer(test.buf[0:test.max])
-		err = msg.Decode(buf)
+		err = test.base.Decode(buf)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("Decode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
@@ -202,209 +209,13 @@ func TestPubKeyWireError(t *testing.T) {
 	// Test error for binary message with a pubkey that is too long.
 	expandedPubKeyEncoded[156] = 90
 	buf := bytes.NewBuffer(expandedPubKeyEncoded)
-	var msg obj.PubKey
+	var msg obj.ExtendedPubKey
 	err := msg.Decode(buf)
 	if reflect.TypeOf(err) != reflect.TypeOf(&wire.MessageError{Func: "", Description: ""}) {
 		t.Errorf("%s", err.Error())
 	}
 	// Return expandedPubKeyEncoded to its original form.
 	expandedPubKeyEncoded[156] = 40
-}
-
-// TestPubKeyEncryption tests the MsgPubKey wire.EncodeForEncryption and
-// DecodeFromDecrypted for various versions.
-func TestPubKeyEncryption(t *testing.T) {
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	sig := make([]byte, 64)
-	msgBase := obj.NewPubKey(83928, expires, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
-	msgExpanded := obj.NewPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
-
-	tests := []struct {
-		in  *obj.PubKey // Message to encode
-		out *obj.PubKey // Expected decoded message
-		buf []byte      // Wire encoding
-	}{
-		// Latest protocol version with multiple object vectors.
-		{
-			msgBase,
-			msgBase,
-			encodedForEncryption1,
-		},
-		{
-			msgExpanded,
-			msgExpanded,
-			encodedForEncryption2,
-		},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// Encode the message to wire.format.
-		var buf bytes.Buffer
-		err := test.in.EncodeForEncryption(&buf)
-		if err != nil {
-			t.Errorf("Encode #%d error %v", i, err)
-			continue
-		}
-		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("EncodeForEncryption #%d\n got: %s want: %s", i,
-				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
-			continue
-		}
-
-		// Decode the message from wire.format.
-		var msg obj.PubKey
-		rbuf := bytes.NewReader(test.buf)
-		err = msg.DecodeFromDecrypted(rbuf)
-		if err != nil {
-			t.Errorf("DecodeFromDecrypted #%d error %v", i, err)
-			continue
-		}
-
-		// Copy the fields that are not written by DecodeFromDecrypted
-		msg.Nonce = test.in.Nonce
-		msg.ExpiresTime = test.in.ExpiresTime
-		msg.ObjectType = test.in.ObjectType
-		msg.Version = test.in.Version
-		msg.StreamNumber = test.in.StreamNumber
-		msg.Tag = test.in.Tag
-		msg.Encrypted = test.in.Encrypted
-
-		// ???
-		msg.Signature = test.in.Signature
-
-		if !reflect.DeepEqual(&msg, test.out) {
-			t.Errorf("DecodeFromDecrypted #%d\n got: %s want: %s", i,
-				spew.Sdump(msg), spew.Sdump(test.out))
-			t.Error("\n", msg, "\n", *test.out)
-			continue
-		}
-	}
-}
-
-// TestPubKeyEncryptError tests the MsgPubKey error paths
-func TestPubKeyEncryptError(t *testing.T) {
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	sig := make([]byte, 64)
-	msgExpanded := obj.NewPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
-
-	tests := []struct {
-		in  *obj.PubKey // Value to encode
-		buf []byte      // Wire encoding
-		max int         // Max size of fixed buffer to induce errors
-	}{
-		// Force error in behavior
-		{msgExpanded, encodedForEncryption2, 0},
-		// Force error in
-		{msgExpanded, encodedForEncryption2, 132},
-		// Force error in
-		{msgExpanded, encodedForEncryption2, 133},
-		// Force error in
-		{msgExpanded, encodedForEncryption2, 134},
-		// Force error in
-		{msgExpanded, encodedForEncryption2, 135},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-
-		// Encode to wire.format.
-		w := fixed.NewWriter(test.max)
-		err := test.in.EncodeForEncryption(w)
-		if err == nil {
-			t.Errorf("EncodeForSigning #%d should have returned an error", i)
-			continue
-		}
-
-		// Decode from wire.format.
-		var msg obj.PubKey
-		buf := bytes.NewBuffer(test.buf[0:test.max])
-		err = msg.DecodeFromDecrypted(buf)
-		if err == nil {
-			t.Errorf("DecodeFromDecrypted #%d should have returned an error", i)
-			continue
-		}
-	}
-
-	// Try to decode a message with too long a signature length.
-	var msg obj.PubKey
-	encodedForEncryption2[134] = 100
-	buf := bytes.NewBuffer(encodedForEncryption2)
-	err := msg.DecodeFromDecrypted(buf)
-	if err == nil {
-		t.Error("EncodeForEncryption should have returned an error for too long a signature length.")
-	}
-	encodedForEncryption2[134] = 64
-}
-
-// TestEncodeForSigning tests EncodeForSigning.
-func TestEncodeForSigning(t *testing.T) {
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	sig := make([]byte, 64)
-	msgBase := obj.NewPubKey(83928, expires, 2, 1, 0, pubKey1, pubKey2, 0, 0, nil, nil, nil)
-	msgExpanded := obj.NewPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
-
-	tests := []struct {
-		in  *obj.PubKey // Message to encode
-		buf []byte      // Wire encoding
-	}{
-		// Latest protocol version with multiple object vectors.
-		{
-			msgBase,
-			encodedForSigning1,
-		},
-		{
-			msgExpanded,
-			encodedForSigning2,
-		},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// Encode the message to wire.format.
-		var buf bytes.Buffer
-		err := test.in.EncodeForSigning(&buf)
-		if err != nil {
-			t.Errorf("EncodeForSigning #%d error %v", i, err)
-			continue
-		}
-		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("EncodeForSigning #%d\n got: %s want: %s", i,
-				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
-			continue
-		}
-	}
-}
-
-// TestEncodeForSigningError tests error paths in EncodeForSigning
-func TestEncodeForSigningError(t *testing.T) {
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	sig := make([]byte, 64)
-	msgExpanded := obj.NewPubKey(83928, expires, 3, 1, 0, pubKey1, pubKey2, 0, 0, sig, nil, nil)
-	msgExpandedEncrypted := obj.NewPubKey(83928, expires, 4, 1, 0, pubKey1, pubKey2, 0, 0, sig,
-		tag, nil)
-
-	tests := []struct {
-		in  *obj.PubKey // Value to encode
-		max []int       // Max sizes of fixed buffer to induce errors
-	}{
-		{msgExpanded, []int{8, 12, 82, 146, 147}},
-		{msgExpandedEncrypted, []int{8, 14}},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		for j, max := range test.max {
-
-			// Encode to wire.format.
-			w := fixed.NewWriter(max)
-			err := test.in.EncodeForSigning(w)
-			if reflect.TypeOf(err) == nil {
-				t.Errorf("EncodeForSigning #%d, %d should have returned an error", i, j)
-				continue
-			}
-		}
-	}
 }
 
 var pubKey1 = &wire.PubKey{
@@ -426,55 +237,7 @@ var tag = &wire.ShaHash{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 }
 
-// basePubKey is used in the various tests as a baseline MsgPubKey.
-var basePubKey = &obj.PubKey{
-	ObjectHeader: wire.ObjectHeader{
-		Nonce:        123123,                   // 0x1e0f3
-		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		ObjectType:   wire.ObjectTypePubKey,
-		Version:      2,
-		StreamNumber: 1,
-	},
-	Behavior:      0,
-	SigningKey:    pubKey1,
-	EncryptionKey: pubKey2,
-}
-
-var expandedPubKey = &obj.PubKey{
-	ObjectHeader: wire.ObjectHeader{
-		Nonce:        123123,                   // 0x1e0f3
-		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		ObjectType:   wire.ObjectTypePubKey,
-		Version:      3,
-		StreamNumber: 1,
-	},
-	Behavior:      0,
-	SigningKey:    pubKey1,
-	EncryptionKey: pubKey2,
-	NonceTrials:   0,
-	ExtraBytes:    0,
-	Signature:     []byte{0, 1, 2, 3},
-}
-
-var encryptedPubKey = &obj.PubKey{
-	ObjectHeader: wire.ObjectHeader{
-		Nonce:        123123,                   // 0x1e0f3
-		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		ObjectType:   wire.ObjectTypePubKey,
-		Version:      4,
-		StreamNumber: 1,
-	},
-	Behavior:      0,
-	SigningKey:    nil,
-	EncryptionKey: nil,
-	NonceTrials:   0,
-	ExtraBytes:    0,
-	Signature:     nil,
-	Tag:           tag,
-	Encrypted:     []byte{0, 1, 2, 3, 4, 5, 6, 7, 8},
-}
-
-// basePubKeyEncoded is the wire.encoded bytes for basePubKey
+// basePubKeyEncoded is the wire.encoded bytes for obj.BasePubKey(pubKey1, pubKey2)
 // using version 2 (pre-tag)
 var basePubKeyEncoded = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce
@@ -581,117 +344,10 @@ var encryptedPubKeyEncoded = []byte{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, // encrypted
 }
 
-var invalidPubKeyVersion = &obj.PubKey{
-	ObjectHeader: wire.ObjectHeader{
-		Nonce:        123123,                   // 0x1e0f3
-		ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-		ObjectType:   wire.ObjectTypePubKey,
-		Version:      5,
-		StreamNumber: 1,
-	},
-	Behavior:      0,
-	SigningKey:    pubKey1,
-	EncryptionKey: pubKey2,
-}
-
 var invalidPubKeyVersionEncoded = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce
 	0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29, // 64-bit Timestamp
 	0x00, 0x00, 0x00, 0x01, // Object Type
 	0x05, // Version
 	0x01, // Stream Number
-}
-
-var encodedForEncryption1 = []byte{
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-}
-
-var encodedForEncryption2 = []byte{
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x40, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-}
-
-var encodedForSigning1 = []byte{
-	0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29,
-	0x00, 0x00, 0x00, 0x01, 0x02, 0x01,
-
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-}
-
-var encodedForSigning2 = []byte{
-	0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29,
-	0x00, 0x00, 0x00, 0x01, 0x03, 0x01,
-
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 }

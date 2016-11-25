@@ -98,7 +98,7 @@ func TestMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create a pubkey %s", err)
 	}
-	msgPubKey := obj.NewPubKey(123123, expires, 2, 1, 0, pub1, pub2, 0, 0, nil, nil, nil)
+	msgPubKey := obj.NewSimplePubKey(123123, expires, 1, 0, pub1, pub2)
 
 	enc := make([]byte, 99)
 	msgMsg := obj.NewMessage(123123, expires, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
@@ -533,8 +533,7 @@ func TestEncodeMessageAndMessageHash(t *testing.T) {
 		{ // pub key object message.
 			// We don't need to try every different kind of message since they have their own
 			// individual Encode methods.
-			obj.NewPubKey(543, expires, 4, 1, 2, &pubkey[0], &pubkey[1], 3, 5,
-				[]byte{4, 5, 6, 7, 8, 9, 10}, &shahash, []byte{11, 12, 13, 14, 15, 16, 17, 18}),
+			obj.NewEncryptedPubKey(543, expires, 1, &shahash, []byte{11, 12, 13, 14, 15, 16, 17, 18}),
 			[]byte{
 				0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x1f,
 				0x00, 0x00, 0x00, 0x00, 0xd8, 0xf9, 0x06, 0x15,

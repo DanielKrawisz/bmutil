@@ -38,7 +38,16 @@ func ReadObject(o *wire.MsgObject) Object {
 	case wire.ObjectTypeGetPubKey:
 		obj = &GetPubKey{}
 	case wire.ObjectTypePubKey:
-		obj = &PubKey{}
+		switch o.Header().Version {
+		case SimplePubKeyVersion:
+			obj = &SimplePubKey{}
+		case ExtendedPubKeyVersion:
+			obj = &ExtendedPubKey{}
+		case EncryptedPubKeyVersion:
+			obj = &EncryptedPubKey{}
+		default:
+			return o
+		}
 	case wire.ObjectTypeMsg:
 		obj = &Message{}
 	case wire.ObjectTypeBroadcast:

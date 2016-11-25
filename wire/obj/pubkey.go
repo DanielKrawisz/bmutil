@@ -7,12 +7,14 @@ package obj
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"time"
 
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
 
@@ -33,257 +35,556 @@ const (
 	signatureMaxLength = 80
 )
 
-// PubKey implements the Message interface and represents a pubkey sent in
-// response to MsgGetPubKey.
-type PubKey struct {
-	wire.ObjectHeader
-	Behavior      uint32
-	SigningKey    *wire.PubKey
-	EncryptionKey *wire.PubKey
-	NonceTrials   uint64
-	ExtraBytes    uint64
-	Signature     []byte
-	Tag           *wire.ShaHash
-	Encrypted     []byte
+// PubKeyData contains the information that is transmitted in a PubKey object.
+type PubKeyData struct {
+	Behavior        uint32
+	VerificationKey *wire.PubKey
+	EncryptionKey   *wire.PubKey
+	Pow             *pow.Data
 }
 
-// Decode decodes r using the bitmessage protocol encoding into the receiver.
-// This is part of the Message interface implementation.
-func (msg *PubKey) Decode(r io.Reader) error {
-	var err error
-	msg.ObjectHeader, err = wire.DecodeMsgObjectHeader(r)
-	if err != nil {
+// EncodeSimple encodes the PubKeyData to a writer according to the format
+// for a SimplePubKey.
+func (pk *PubKeyData) EncodeSimple(w io.Writer) error {
+	return wire.WriteElements(w, pk.Behavior, pk.VerificationKey, pk.EncryptionKey)
+}
+
+// Encode encodes the PubKeyData to a writer.
+func (pk *PubKeyData) Encode(w io.Writer) error {
+	if err := pk.EncodeSimple(w); err != nil {
 		return err
 	}
 
-	if msg.ObjectType != wire.ObjectTypePubKey {
-		str := fmt.Sprintf("Object Type should be %d, but is %d",
-			wire.ObjectTypePubKey, msg.ObjectType)
-		return wire.NewMessageError("Decode", str)
-	}
-
-	switch msg.Version {
-	case SimplePubKeyVersion:
-		msg.SigningKey = &wire.PubKey{}
-		msg.EncryptionKey = &wire.PubKey{}
-		return wire.ReadElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
-	case ExtendedPubKeyVersion:
-		msg.SigningKey = &wire.PubKey{}
-		msg.EncryptionKey = &wire.PubKey{}
-		var sigLength uint64
-		err = wire.ReadElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+	if pk.Pow != nil {
+		err := pk.Pow.Encode(w)
 		if err != nil {
 			return err
 		}
-		if msg.NonceTrials, err = bmutil.ReadVarInt(r); err != nil {
-			return err
-		}
-		if msg.ExtraBytes, err = bmutil.ReadVarInt(r); err != nil {
-			return err
-		}
-		if sigLength, err = bmutil.ReadVarInt(r); err != nil {
-			return err
-		}
-		if sigLength > signatureMaxLength {
-			str := fmt.Sprintf("signature length exceeds max length - "+
-				"indicates %d, but max length is %d",
-				sigLength, signatureMaxLength)
-			return wire.NewMessageError("Decode", str)
-		}
-		msg.Signature = make([]byte, sigLength)
-		_, err = io.ReadFull(r, msg.Signature)
-		return err
-	case EncryptedPubKeyVersion:
-		msg.Tag = &wire.ShaHash{}
-		if err = wire.ReadElement(r, msg.Tag); err != nil {
-			return err
-		}
-		// The rest is the encrypted data, accessible only to those that know
-		// the address that the pubkey belongs to.
-		msg.Encrypted, err = ioutil.ReadAll(r)
-		return err
-	default:
-		return wire.NewMessageError("PubKey.Decode", "unsupported PubKey version")
-	}
-}
-
-func (msg *PubKey) encodePayload(w io.Writer) error {
-	switch msg.Version {
-	case SimplePubKeyVersion:
-		return wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
-	case ExtendedPubKeyVersion:
-		err := wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
-		if err != nil {
-			return err
-		}
-		if err = bmutil.WriteVarInt(w, msg.NonceTrials); err != nil {
-			return err
-		}
-		if err = bmutil.WriteVarInt(w, msg.ExtraBytes); err != nil {
-			return err
-		}
-		sigLength := uint64(len(msg.Signature))
-		if err = bmutil.WriteVarInt(w, sigLength); err != nil {
-			return err
-		}
-		_, err = w.Write(msg.Signature)
-		return err
-	case EncryptedPubKeyVersion:
-		if err := wire.WriteElement(w, msg.Tag); err != nil {
-			return err
-		}
-		// The rest is the encrypted data, accessible only to the holder
-		// of the private key to whom it's addressed.
-		_, err := w.Write(msg.Encrypted)
-		return err
-	default:
-		return wire.NewMessageError("PubKey.Encode", "unsupported PubKey version")
-	}
-}
-
-// Encode encodes the receiver to w using the bitmessage protocol encoding.
-// This is part of the Message interface implementation.
-func (msg *PubKey) Encode(w io.Writer) error {
-	err := msg.ObjectHeader.Encode(w)
-	if err != nil {
-		return err
-	}
-
-	return msg.encodePayload(w)
-}
-
-// MaxPayloadLength returns the maximum length the payload can be for the
-// receiver. This is part of the Message interface implementation.
-func (msg *PubKey) MaxPayloadLength() int {
-	// TODO find a sensible value based on pubkey version
-	return wire.MaxPayloadOfMsgObject
-}
-
-func (msg *PubKey) String() string {
-	return fmt.Sprintf("pubkey: v%d %d %s %d %x", msg.Version, msg.Nonce, msg.ExpiresTime, msg.StreamNumber, msg.Tag)
-}
-
-// EncodeForSigning encodes PubKey so that it can be hashed and signed.
-func (msg *PubKey) EncodeForSigning(w io.Writer) error {
-	err := msg.ObjectHeader.EncodeForSigning(w)
-	if err != nil {
-		return err
-	}
-	if msg.Version == EncryptedPubKeyVersion {
-		err = wire.WriteElement(w, msg.Tag)
-		if err != nil {
-			return err
-		}
-	}
-	err = wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
-	if err != nil {
-		return err
-	}
-	if err = bmutil.WriteVarInt(w, msg.NonceTrials); err != nil {
-		return err
-	}
-	if err = bmutil.WriteVarInt(w, msg.ExtraBytes); err != nil {
-		return err
 	}
 
 	return nil
 }
 
-// EncodeForEncryption encodes PubKey so that it can be encrypted.
-func (msg *PubKey) EncodeForEncryption(w io.Writer) error {
-	err := wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
-	if err != nil {
-		return err
-	}
-	if err = bmutil.WriteVarInt(w, msg.NonceTrials); err != nil {
-		return err
-	}
-	if err = bmutil.WriteVarInt(w, msg.ExtraBytes); err != nil {
-		return err
-	}
-	sigLength := uint64(len(msg.Signature))
-	if err = bmutil.WriteVarInt(w, sigLength); err != nil {
-		return err
-	}
-	if _, err = w.Write(msg.Signature); err != nil {
-		return err
-	}
-	return nil
+// DecodeSimple decodes a PubKeyData according to the simpler, original
+// format for PubKey objects.
+func (pk *PubKeyData) DecodeSimple(r io.Reader) error {
+	pk.VerificationKey = &wire.PubKey{}
+	pk.EncryptionKey = &wire.PubKey{}
+	return wire.ReadElements(r, &pk.Behavior, pk.VerificationKey, pk.EncryptionKey)
 }
 
-// DecodeFromDecrypted decodes PubKey from its decrypted form.
-func (msg *PubKey) DecodeFromDecrypted(r io.Reader) error {
-	msg.SigningKey = &wire.PubKey{}
-	msg.EncryptionKey = &wire.PubKey{}
-	err := wire.ReadElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+// Decode decodes a PubKeyData from a reader.
+func (pk *PubKeyData) Decode(r io.Reader) error {
+	err := pk.DecodeSimple(r)
 	if err != nil {
 		return err
 	}
-	if msg.NonceTrials, err = bmutil.ReadVarInt(r); err != nil {
-		return err
+
+	pk.Pow = &pow.Data{}
+	return pk.Pow.Decode(r)
+}
+
+// String creates a human-readible string of a PubKeyData.
+func (pk *PubKeyData) String() string {
+	str := fmt.Sprintf("{Behavior: %d, VerificationKey: %s, EncryptionKey: %s",
+		pk.Behavior, pk.VerificationKey.String(), pk.EncryptionKey.String())
+
+	if pk.Pow != nil {
+		str += ", " + pk.Pow.String()
 	}
-	if msg.ExtraBytes, err = bmutil.ReadVarInt(r); err != nil {
-		return err
+
+	return str + "}"
+}
+
+// EncodePubKeySignature encodes a PubKey signature.
+func EncodePubKeySignature(w io.Writer, signature []byte) (err error) {
+	sigLength := uint64(len(signature))
+	err = bmutil.WriteVarInt(w, sigLength)
+	if err != nil {
+		return
 	}
-	var sigLength uint64
-	if sigLength, err = bmutil.ReadVarInt(r); err != nil {
-		return err
+	_, err = w.Write(signature)
+	return
+}
+
+// DecodePubKeySignature decodes a PubKey signature.
+func DecodePubKeySignature(r io.Reader) (signature []byte, err error) {
+	sigLength, err := bmutil.ReadVarInt(r)
+	if err != nil {
+		return
 	}
 	if sigLength > signatureMaxLength {
 		str := fmt.Sprintf("signature length exceeds max length - "+
 			"indicates %d, but max length is %d",
 			sigLength, signatureMaxLength)
-		return wire.NewMessageError("DecodeFromDecrypted", str)
+		err = wire.NewMessageError("Decode", str)
+		return
 	}
-	msg.Signature = make([]byte, sigLength)
-	_, err = io.ReadFull(r, msg.Signature)
-	return err
+	signature = make([]byte, sigLength)
+	_, err = io.ReadFull(r, signature)
+	return
 }
 
-// Header returns the object header.
-func (msg *PubKey) Header() *wire.ObjectHeader {
-	return &msg.ObjectHeader
+// SimplePubKey implements the Message and Object interfaces and represents a pubkey sent in
+// response to MsgGetPubKey.
+type SimplePubKey struct {
+	header *wire.ObjectHeader
+	Data   *PubKeyData
 }
 
-// ObjectPayload return the object payload of the message.
-func (msg *PubKey) Payload() []byte {
-	w := &bytes.Buffer{}
-	msg.encodePayload(w)
-	return w.Bytes()
-}
-
-// MsgObject transforms the PubKey to a *MsgObject.
-func (msg *PubKey) MsgObject() *wire.MsgObject {
-	return wire.NewMsgObject(msg.ObjectHeader.Nonce,
-		msg.ObjectHeader.ExpiresTime, msg.ObjectHeader.ObjectType,
-		msg.ObjectHeader.Version, msg.ObjectHeader.StreamNumber, msg.Payload())
-}
-
-func (msg *PubKey) InventoryHash() *wire.ShaHash {
-	return msg.MsgObject().InventoryHash()
-}
-
-// NewPubKey returns a new object message that conforms to the Message
+// NewSimplePubKey returns a new object message that conforms to the Message
 // interface using the passed parameters and defaults for the remaining fields.
-func NewPubKey(nonce uint64, expires time.Time,
-	version, streamNumber uint64, behavior uint32,
-	signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes uint64,
-	signature []byte, tag *wire.ShaHash, encrypted []byte) *PubKey {
-	return &PubKey{
-		ObjectHeader: wire.ObjectHeader{
+func NewSimplePubKey(nonce uint64, expires time.Time,
+	streamNumber uint64, behavior uint32,
+	signingKey, encryptKey *wire.PubKey) *SimplePubKey {
+	return &SimplePubKey{
+		header: &wire.ObjectHeader{
 			Nonce:        nonce,
 			ExpiresTime:  expires,
 			ObjectType:   wire.ObjectTypePubKey,
-			Version:      version,
+			Version:      SimplePubKeyVersion,
 			StreamNumber: streamNumber,
 		},
-		Behavior:      behavior,
-		SigningKey:    signingKey,
-		EncryptionKey: encryptKey,
-		NonceTrials:   nonceTrials,
-		ExtraBytes:    extraBytes,
-		Signature:     signature,
-		Tag:           tag,
-		Encrypted:     encrypted,
+		Data: &PubKeyData{
+			Behavior:        behavior,
+			VerificationKey: signingKey,
+			EncryptionKey:   encryptKey,
+		},
+	}
+}
+
+func (p *SimplePubKey) decodePayload(r io.Reader) error {
+	p.Data = &PubKeyData{}
+	return p.Data.DecodeSimple(r)
+}
+
+// Decode is part of the Message interface and it reads a new SimplePubKey
+// in from r.
+func (p *SimplePubKey) Decode(r io.Reader) error {
+	var err error
+	p.header, err = wire.DecodeMsgObjectHeader(r)
+	if err != nil {
+		return err
+	}
+
+	if p.header.ObjectType != wire.ObjectTypePubKey {
+		str := fmt.Sprintf("Object Type should be %d, but is %d",
+			wire.ObjectTypePubKey, p.header.ObjectType)
+		return wire.NewMessageError("Decode", str)
+	}
+
+	if p.header.Version != SimplePubKeyVersion {
+		str := fmt.Sprintf("Object version should be %d, but is %d",
+			SimplePubKeyVersion, p.header.Version)
+		return wire.NewMessageError("Decode", str)
+	}
+
+	return p.decodePayload(r)
+}
+
+func (p *SimplePubKey) encodePayload(w io.Writer) error {
+	return p.Data.EncodeSimple(w)
+}
+
+// Encode is part of the Message interface and it writes the SimplePubKey
+// as a string of bits to the Writer.
+func (p *SimplePubKey) Encode(w io.Writer) error {
+	err := p.header.Encode(w)
+	if err != nil {
+		return err
+	}
+
+	return p.encodePayload(w)
+}
+
+// Command returns the protocol command string for the message. This is part
+// of the Message interface implementation.
+func (p *SimplePubKey) Command() string {
+	return wire.CmdObject
+}
+
+// MaxPayloadLength returns the maximum length the payload can be for the
+// receiver. This is part of the Message interface implementation.
+func (p *SimplePubKey) MaxPayloadLength() int {
+	return wire.MaxPayloadOfMsgObject
+}
+
+// Header is part of the Object interface and returns the object header.
+func (p *SimplePubKey) Header() *wire.ObjectHeader {
+	return p.header
+}
+
+// Payload is part of the Object interface and
+// returns the object payload of the message.
+func (p *SimplePubKey) Payload() []byte {
+	w := &bytes.Buffer{}
+	p.encodePayload(w)
+	return w.Bytes()
+}
+
+// MsgObject is part of the Object interface and transforms
+// the abstract Object to a *MsgObject.
+func (p *SimplePubKey) MsgObject() *wire.MsgObject {
+	return wire.NewMsgObject(p.header, p.Payload())
+}
+
+// InventoryHash is part of the Object interface and returns the invhash of the
+// object.
+func (p *SimplePubKey) InventoryHash() *wire.ShaHash {
+	return p.MsgObject().InventoryHash()
+}
+
+// Behavior returns the PubKey's behavior (currently unused).
+func (p *SimplePubKey) Behavior() uint32 {
+	return p.Data.Behavior
+}
+
+// VerificationKey return's the PubKey's VerificationKey
+func (p *SimplePubKey) VerificationKey() *wire.PubKey {
+	return p.Data.VerificationKey
+}
+
+// EncryptionKey return's the PubKey's EncryptionKey
+func (p *SimplePubKey) EncryptionKey() *wire.PubKey {
+	return p.Data.EncryptionKey
+}
+
+// Pow return's the key's pow data. For the SimplePubKey, this is nil.
+func (p *SimplePubKey) Pow() *pow.Data {
+	return nil
+}
+
+// Tag return's the key's pow data. For the SimplePubKey, this is nil.
+func (p *SimplePubKey) Tag() *wire.ShaHash {
+	return nil
+}
+
+// Object is part of the cipher.PubKey interface and returns the PubKey
+// as an Object type.
+func (p *SimplePubKey) Object() Object {
+	return p
+}
+
+// String returns a representation of the SimplePubKey as a
+// human-readable string.
+func (p *SimplePubKey) String() string {
+	return "SimplePubKey{" + p.header.String() + ", " + p.Data.String() + "}"
+}
+
+// ExtendedPubKey implements the Message and Object interfaces and represents an
+// extended pubkey sent in response to MsgGetPubKey. The extended pub key includes
+// information about the proof-of-work required to send a message.
+type ExtendedPubKey struct {
+	header    *wire.ObjectHeader
+	Data      *PubKeyData
+	Signature []byte
+}
+
+func (p *ExtendedPubKey) decodePayload(r io.Reader) error {
+	var err error
+	p.Data = &PubKeyData{}
+	err = p.Data.Decode(r)
+	if err != nil {
+		return nil
+	}
+
+	p.Signature, err = DecodePubKeySignature(r)
+	return err
+}
+
+// Decode decodes an ExtendedPubKey from a reader.
+func (p *ExtendedPubKey) Decode(r io.Reader) error {
+	var err error
+	p.header, err = wire.DecodeMsgObjectHeader(r)
+	if err != nil {
+		return err
+	}
+
+	if p.header.ObjectType != wire.ObjectTypePubKey {
+		str := fmt.Sprintf("Object Type should be %d, but is %d",
+			wire.ObjectTypePubKey, p.header.ObjectType)
+		return wire.NewMessageError("Decode", str)
+	}
+
+	if p.header.Version != ExtendedPubKeyVersion {
+		str := fmt.Sprintf("Object version should be %d, but is %d",
+			ExtendedPubKeyVersion, p.header.Version)
+		return wire.NewMessageError("Decode", str)
+	}
+
+	return p.decodePayload(r)
+}
+
+func (p *ExtendedPubKey) encodePayload(w io.Writer) error {
+	err := p.Data.Encode(w)
+	if err != nil {
+		return err
+	}
+
+	return EncodePubKeySignature(w, p.Signature)
+}
+
+// Encode encodes the receiver to w using the bitmessage protocol encoding.
+// This is part of the Message interface implementation.
+func (p *ExtendedPubKey) Encode(w io.Writer) error {
+	err := p.header.Encode(w)
+	if err != nil {
+		return err
+	}
+
+	return p.encodePayload(w)
+}
+
+func (p *ExtendedPubKey) EncodeForSigning(w io.Writer) error {
+	err := p.header.EncodeForSigning(w)
+	if err != nil {
+		return err
+	}
+
+	return p.Data.Encode(w)
+}
+
+// Command returns the protocol command string for the message. This is part
+// of the Message interface implementation.
+func (p *ExtendedPubKey) Command() string {
+	return wire.CmdObject
+}
+
+// MaxPayloadLength returns the maximum length the payload can be for the
+// receiver. This is part of the Message interface implementation.
+func (p *ExtendedPubKey) MaxPayloadLength() int {
+	return wire.MaxPayloadOfMsgObject
+}
+
+// Header is part of the Object interface and returns the object header.
+func (p *ExtendedPubKey) Header() *wire.ObjectHeader {
+	return p.header
+}
+
+// Payload is part of the Object interface and
+// returns the object payload of the message.
+func (p *ExtendedPubKey) Payload() []byte {
+	w := &bytes.Buffer{}
+	p.encodePayload(w)
+	return w.Bytes()
+}
+
+// MsgObject is part of the Object interface and transforms
+// the abstract Object to a *MsgObject.
+func (p *ExtendedPubKey) MsgObject() *wire.MsgObject {
+	return wire.NewMsgObject(p.header, p.Payload())
+}
+
+// InventoryHash is part of the Object interface and returns the invhash of the
+// object.
+func (p *ExtendedPubKey) InventoryHash() *wire.ShaHash {
+	return p.MsgObject().InventoryHash()
+}
+
+// Behavior returns the PubKey's behavior (currently unused).
+func (p *ExtendedPubKey) Behavior() uint32 {
+	return p.Data.Behavior
+}
+
+// VerificationKey return's the PubKey's VerificationKey
+func (p *ExtendedPubKey) VerificationKey() *wire.PubKey {
+	return p.Data.VerificationKey
+}
+
+// EncryptionKey return's the PubKey's EncryptionKey
+func (p *ExtendedPubKey) EncryptionKey() *wire.PubKey {
+	return p.Data.EncryptionKey
+}
+
+// Pow return's the key's pow data. For the SimplePubKey, this is nil.
+func (p *ExtendedPubKey) Pow() *pow.Data {
+	return p.Data.Pow
+}
+
+// Tag return's the key's pow data. For the SimplePubKey, this is nil.
+func (p *ExtendedPubKey) Tag() *wire.ShaHash {
+	return nil
+}
+
+// Object is part of the cipher.PubKey interface and returns the PubKey
+// as an Object type.
+func (p *ExtendedPubKey) Object() Object {
+	return p
+}
+
+func (p *ExtendedPubKey) String() string {
+	return "SimplePubKey{" + p.header.String() + ", " + p.Data.String() + ", " + hex.EncodeToString(p.Signature) + "}"
+}
+
+// NewExtendedPubKey returns a new object message that conforms to the Message
+// interface using the passed parameters and defaults for the remaining fields.
+func NewExtendedPubKey(nonce uint64, expires time.Time, streamNumber uint64,
+	behavior uint32, signingKey, encryptKey *wire.PubKey, powData *pow.Data,
+	signature []byte) *ExtendedPubKey {
+	return &ExtendedPubKey{
+		header: &wire.ObjectHeader{
+			Nonce:        nonce,
+			ExpiresTime:  expires,
+			ObjectType:   wire.ObjectTypePubKey,
+			Version:      ExtendedPubKeyVersion,
+			StreamNumber: streamNumber,
+		},
+		Data: &PubKeyData{
+			Behavior:        behavior,
+			VerificationKey: signingKey,
+			EncryptionKey:   encryptKey,
+			Pow:             powData,
+		},
+		Signature: signature,
+	}
+}
+
+// EncryptedPubKey represents an encrypted pubkey.
+type EncryptedPubKey struct {
+	header    *wire.ObjectHeader
+	Tag       *wire.ShaHash
+	Encrypted []byte
+}
+
+func (p *EncryptedPubKey) decodePayload(r io.Reader) error {
+	var err error
+	p.Tag = &wire.ShaHash{}
+	if err = wire.ReadElement(r, p.Tag); err != nil {
+		return err
+	}
+	// The rest is the encrypted data, accessible only to those that know
+	// the address that the pubkey belongs to.
+	p.Encrypted, err = ioutil.ReadAll(r)
+	return err
+}
+
+// Decode decodes an EncryptedPubKey from a reader.
+func (p *EncryptedPubKey) Decode(r io.Reader) error {
+	var err error
+	p.header, err = wire.DecodeMsgObjectHeader(r)
+	if err != nil {
+		return err
+	}
+
+	if p.header.ObjectType != wire.ObjectTypePubKey {
+		str := fmt.Sprintf("Object Type should be %d, but is %d",
+			wire.ObjectTypePubKey, p.header.ObjectType)
+		return wire.NewMessageError("Decode", str)
+	}
+
+	if p.header.Version != EncryptedPubKeyVersion {
+		str := fmt.Sprintf("Object version should be %d, but is %d",
+			EncryptedPubKeyVersion, p.header.Version)
+		return wire.NewMessageError("Decode", str)
+	}
+
+	return p.decodePayload(r)
+}
+
+func (p *EncryptedPubKey) encodePayload(w io.Writer) error {
+	if err := wire.WriteElement(w, p.Tag); err != nil {
+		return err
+	}
+	// The rest is the encrypted data, accessible only to the holder
+	// of the private key to whom it's addressed.
+	_, err := w.Write(p.Encrypted)
+	return err
+}
+
+// Encode encodes the receiver to w using the bitmessage protocol encoding.
+// This is part of the Message interface implementation.
+func (p *EncryptedPubKey) Encode(w io.Writer) error {
+	err := p.header.Encode(w)
+	if err != nil {
+		return err
+	}
+
+	return p.encodePayload(w)
+}
+
+// Command returns the protocol command string for the message. This is part
+// of the Message interface implementation.
+func (p *EncryptedPubKey) Command() string {
+	return wire.CmdObject
+}
+
+// MaxPayloadLength returns the maximum length the payload can be for the
+// receiver. This is part of the Message interface implementation.
+func (p *EncryptedPubKey) MaxPayloadLength() int {
+	return wire.MaxPayloadOfMsgObject
+}
+
+// Header is part of the Object interface and returns the object header.
+func (p *EncryptedPubKey) Header() *wire.ObjectHeader {
+	return p.header
+}
+
+// Payload is part of the Object interface and
+// returns the object payload of the message.
+func (p *EncryptedPubKey) Payload() []byte {
+	w := &bytes.Buffer{}
+	p.encodePayload(w)
+	return w.Bytes()
+}
+
+// MsgObject is part of the Object interface and transforms
+// the abstract Object to a *MsgObject.
+func (p *EncryptedPubKey) MsgObject() *wire.MsgObject {
+	return wire.NewMsgObject(p.header, p.Payload())
+}
+
+// InventoryHash is part of the Object interface and returns the invhash of the
+// object.
+func (p *EncryptedPubKey) InventoryHash() *wire.ShaHash {
+	return p.MsgObject().InventoryHash()
+}
+
+func (p *EncryptedPubKey) String() string {
+	return "ExtendedPubKey{" + p.header.String() + ", " + p.Tag.String() + ", " + hex.EncodeToString(p.Encrypted) + "}"
+}
+
+// NewEncryptedPubKey returns a new object message that conforms to the Message
+// interface using the passed parameters and defaults for the remaining fields.
+func NewEncryptedPubKey(nonce uint64, expires time.Time,
+	streamNumber uint64, tag *wire.ShaHash, encrypted []byte) *EncryptedPubKey {
+	return &EncryptedPubKey{
+		header: &wire.ObjectHeader{
+			Nonce:        nonce,
+			ExpiresTime:  expires,
+			ObjectType:   wire.ObjectTypePubKey,
+			Version:      EncryptedPubKeyVersion,
+			StreamNumber: streamNumber,
+		},
+		Tag:       tag,
+		Encrypted: encrypted,
+	}
+}
+
+// DecodePubKey takes a reader and decodes it as some kind of PubKey object.
+func DecodePubKey(r io.Reader) (Object, error) {
+	header, err := wire.DecodeMsgObjectHeader(r)
+	if err != nil {
+		return nil, err
+	}
+
+	if header.ObjectType != wire.ObjectTypePubKey {
+		str := fmt.Sprintf("Object Type should be %d, but is %d",
+			wire.ObjectTypePubKey, header.ObjectType)
+		return nil, wire.NewMessageError("Decode", str)
+	}
+
+	switch header.Version {
+	default:
+		str := fmt.Sprintf("Object version is %d", header.Version)
+		return nil, wire.NewMessageError("Decode", str)
+	case SimplePubKeyVersion:
+		k := &SimplePubKey{header: header}
+		return k, k.decodePayload(r)
+	case ExtendedPubKeyVersion:
+		k := &ExtendedPubKey{header: header}
+		return k, k.decodePayload(r)
+	case EncryptedPubKeyVersion:
+		k := &EncryptedPubKey{header: header}
+		return k, k.decodePayload(r)
 	}
 }

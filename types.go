@@ -16,7 +16,7 @@ import (
 	"math"
 )
 
-// Maximum size of a variable length integer.
+// MaxVarIntSize is the maximum size of a variable length integer.
 const MaxVarIntSize = 9
 
 // ReadVarInt reads a variable length integer from r and returns it as a uint64.

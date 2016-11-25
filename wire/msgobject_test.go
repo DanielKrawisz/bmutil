@@ -134,7 +134,7 @@ func TestDecodeMsgObject(t *testing.T) {
 			[]byte{},
 			true,
 		},
-		{ // Valid case: unknown object.
+		{ // Valid case. Not a real object but we wouldn't know that.
 			[]byte{
 				0, 0, 0, 0, 0, 0, 0, 123, // Nonce
 				0, 0, 0, 0, 85, 75, 111, 20, // Expiration
@@ -153,8 +153,7 @@ func TestDecodeMsgObject(t *testing.T) {
 			false,
 		},
 		{ // Valid case: PubKey object.
-			wire.EncodeMessage(obj.NewPubKey(543, expires, 4, 1, 2, &pubkey[0], &pubkey[1], 3, 5,
-				[]byte{4, 5, 6, 7, 8, 9, 10}, &shahash, []byte{11, 12, 13, 14, 15, 16, 17, 18}).MsgObject()),
+			wire.EncodeMessage(obj.NewEncryptedPubKey(543, expires, 1, &shahash, []byte{11, 12, 13, 14, 15, 16, 17, 18}).MsgObject()),
 			false,
 		},
 		{ // Valid case: Msg object.
@@ -175,7 +174,7 @@ func TestDecodeMsgObject(t *testing.T) {
 			false,
 		},
 		{ // Valid case: unknown object.
-			wire.EncodeMessage(wire.NewMsgObject(345, expires, wire.ObjectType(4), 1, 1, []byte{77, 82, 53, 48, 96, 1})),
+			wire.EncodeMessage(wire.NewMsgObject(&wire.ObjectHeader{345, expires, wire.ObjectType(4), 1, 1}, []byte{77, 82, 53, 48, 96, 1})),
 			false,
 		},
 	}
@@ -214,8 +213,7 @@ func TestCopy(t *testing.T) {
 		108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123,
 		124, 125, 126, 127, 128, 129})
 
-	pubKey := obj.NewPubKey(543, expires, 4, 1, 2, &pubkey[0], &pubkey[1], 3, 5,
-		[]byte{4, 5, 6, 7, 8, 9, 10}, &shahash, []byte{11, 12, 13, 14, 15, 16, 17, 18}).MsgObject()
+	pubKey := obj.NewEncryptedPubKey(543, expires, 1, &shahash, []byte{11, 12, 13, 14, 15, 16, 17, 18}).MsgObject()
 
 	msg := obj.NewMessage(765, expires, 1, 1,
 		[]byte{90, 87, 66, 45, 3, 2, 120, 101, 78, 78, 78, 7, 85, 55, 2, 23},
@@ -230,7 +228,7 @@ func TestCopy(t *testing.T) {
 		[]byte{27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41},
 		[]byte{42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56}).MsgObject()
 
-	unknown := wire.NewMsgObject(345, expires, wire.ObjectType(4), 1, 1, []byte{77, 82, 53, 48, 96, 1})
+	unknown := wire.NewMsgObject(&wire.ObjectHeader{345, expires, wire.ObjectType(4), 1, 1}, []byte{77, 82, 53, 48, 96, 1})
 
 	tests := []struct {
 		obj *wire.MsgObject
@@ -253,19 +251,24 @@ func TestCopy(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		copy := test.obj.Copy()
-		if !bytes.Equal(wire.EncodeMessage(test.obj), wire.EncodeMessage(copy)) {
+		cp := test.obj.Copy()
+		if cp == nil {
+			t.Errorf("Copy is nil.")
+			continue
+		}
+
+		if !bytes.Equal(wire.EncodeMessage(test.obj), wire.EncodeMessage(cp)) {
 			t.Errorf("failed test case %d.", i)
 		}
-		test.obj.ObjectPayload()[0]++
-		if bytes.Equal(wire.EncodeMessage(test.obj), wire.EncodeMessage(copy)) {
+		test.obj.Payload()[0]++
+		if bytes.Equal(wire.EncodeMessage(test.obj), wire.EncodeMessage(cp)) {
 			t.Errorf("failed test case %d after original was altered.", i)
 		}
 	}
 }
 
 func TestNew(t *testing.T) {
-	obj := wire.NewMsgObject(123, time.Now(), 3, 1, 1, []byte{1, 2, 3, 4, 5, 56})
+	obj := wire.NewMsgObject(&wire.ObjectHeader{123, time.Now(), 3, 1, 1}, []byte{1, 2, 3, 4, 5, 56})
 
 	if obj == nil {
 		t.Error("Failed to return object.")

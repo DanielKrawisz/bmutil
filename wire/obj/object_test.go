@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/obj"
 	"github.com/davecgh/go-spew/spew"
@@ -67,7 +68,10 @@ func TestObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create a pubkey %s", err)
 	}
-	msgPubKey := obj.NewPubKey(123123, expires, 2, 1, 0, pub1, pub2, 0, 0, nil, nil, nil)
+	var tag wire.ShaHash
+	msgSimplePubKey := obj.NewSimplePubKey(123123, expires, 1, 0, pub1, pub2)
+	msgExtendedPubKey := obj.NewExtendedPubKey(123123, expires, 1, 0, pub1, pub2, &pow.Data{4, 5}, []byte{1, 2, 3})
+	msgEncryptedPubKey := obj.NewEncryptedPubKey(123123, expires, 1, &tag, []byte{1, 2, 3, 4, 5})
 
 	enc := make([]byte, 99)
 	msgMsg := obj.NewMessage(123123, expires, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
@@ -81,7 +85,9 @@ func TestObject(t *testing.T) {
 		bytes int                // Expected num bytes read/written
 	}{
 		{msgGetPubKey, msgGetPubKey, wire.MainNet, 66},
-		{msgPubKey, msgPubKey, wire.MainNet, 178},
+		{msgSimplePubKey, msgSimplePubKey, wire.MainNet, 178},
+		{msgExtendedPubKey, msgExtendedPubKey, wire.MainNet, 178 + 6},
+		{msgEncryptedPubKey, msgEncryptedPubKey, wire.MainNet, 83},
 		{msgMsg, msgMsg, wire.MainNet, 145},
 		{msgBroadcast, msgBroadcast, wire.MainNet, 145},
 	}

@@ -18,11 +18,10 @@ import (
 // information about stream number and address version.
 type Public struct {
 	bmutil.Address
-	NonceTrialsPerByte uint64
-	ExtraBytes         uint64
-	SigningKey         *btcec.PublicKey
-	EncryptionKey      *btcec.PublicKey
-	Behavior           uint32
+	pow.Data
+	SigningKey    *btcec.PublicKey
+	EncryptionKey *btcec.PublicKey
+	Behavior      uint32
 }
 
 // CreateAddress populates the Address object within the identity based on the
