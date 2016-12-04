@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
 
@@ -279,7 +280,7 @@ func (msg *TaggedBroadcast) Encrypted() []byte {
 // NewTaglessBroadcast returns a new object message that conforms to the
 // Object interface using the passed parameters and defaults for the remaining
 // fields.
-func NewTaglessBroadcast(nonce uint64, expiration time.Time, streamNumber uint64,
+func NewTaglessBroadcast(nonce pow.Nonce, expiration time.Time, streamNumber uint64,
 	encrypted []byte) *TaglessBroadcast {
 	return &TaglessBroadcast{
 		header: wire.NewObjectHeader(
@@ -296,7 +297,7 @@ func NewTaglessBroadcast(nonce uint64, expiration time.Time, streamNumber uint64
 // NewTaggedBroadcast returns a new object message that conforms to the
 // Object interface using the passed parameters and defaults for the remaining
 // fields.
-func NewTaggedBroadcast(nonce uint64, expiration time.Time, streamNumber uint64,
+func NewTaggedBroadcast(nonce pow.Nonce, expiration time.Time, streamNumber uint64,
 	tag *wire.ShaHash, encrypted []byte) *TaggedBroadcast {
 	return &TaggedBroadcast{
 		header: wire.NewObjectHeader(

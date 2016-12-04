@@ -134,7 +134,7 @@ type SimplePubKey struct {
 
 // NewSimplePubKey returns a new object message that conforms to the Message
 // interface using the passed parameters and defaults for the remaining fields.
-func NewSimplePubKey(nonce uint64, expiration time.Time,
+func NewSimplePubKey(nonce pow.Nonce, expiration time.Time,
 	streamNumber uint64, behavior uint32,
 	signingKey, encryptKey *wire.PubKey) *SimplePubKey {
 	return &SimplePubKey{
@@ -417,7 +417,7 @@ func (p *ExtendedPubKey) String() string {
 
 // NewExtendedPubKey returns a new object message that conforms to the Message
 // interface using the passed parameters and defaults for the remaining fields.
-func NewExtendedPubKey(nonce uint64, expiration time.Time, streamNumber uint64,
+func NewExtendedPubKey(nonce pow.Nonce, expiration time.Time, streamNumber uint64,
 	behavior uint32, signingKey, encryptKey *wire.PubKey, powData *pow.Data,
 	signature []byte) *ExtendedPubKey {
 	return &ExtendedPubKey{
@@ -544,7 +544,7 @@ func (p *EncryptedPubKey) String() string {
 
 // NewEncryptedPubKey returns a new object message that conforms to the Message
 // interface using the passed parameters and defaults for the remaining fields.
-func NewEncryptedPubKey(nonce uint64, expiration time.Time,
+func NewEncryptedPubKey(nonce pow.Nonce, expiration time.Time,
 	streamNumber uint64, tag *wire.ShaHash, encrypted []byte) *EncryptedPubKey {
 	return &EncryptedPubKey{
 		header: wire.NewObjectHeader(

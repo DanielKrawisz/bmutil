@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
 
@@ -100,7 +101,7 @@ func (msg *Message) InventoryHash() *wire.ShaHash {
 
 // NewMessage returns a new object message that conforms to the Message interface
 // using the passed parameters and defaults for the remaining fields.
-func NewMessage(nonce uint64, expiration time.Time, streamNumber uint64, encrypted []byte) *Message {
+func NewMessage(nonce pow.Nonce, expiration time.Time, streamNumber uint64, encrypted []byte) *Message {
 	return &Message{
 		header: wire.NewObjectHeader(
 			nonce,

@@ -8,10 +8,8 @@ package pow
 import (
 	"encoding/binary"
 	"math"
-	"time"
 
 	"github.com/DanielKrawisz/bmutil"
-	"github.com/DanielKrawisz/bmutil/wire"
 )
 
 // CalculateTarget calculates the target POW value. payloadLength includes the
@@ -27,30 +25,8 @@ func CalculateTarget(payloadLength, ttl uint64, data Data) uint64 {
 			math.Pow(2, 16))))
 }
 
-// Check checks if the POW that was done for an object message is sufficient.
-// obj is a byte slice containing the object message.
-func Check(msg *wire.MsgObject, data Data, refTime time.Time) bool {
-	// calculate ttl from bytes 8-16 that contain ExpiresTime
-	ttl := uint64(msg.Header().Expiration().Unix() - refTime.Unix())
-
-	obj := wire.EncodeMessage(msg)
-	msgHash := bmutil.Sha512(obj[8:]) // exclude nonce value in the beginning
-	payloadLength := uint64(len(obj))
-
-	hashData := make([]byte, 8+len(msgHash))
-	copy(hashData[:8], obj[:8]) // nonce
-	copy(hashData[8:], msgHash)
-	resultHash := bmutil.DoubleSha512(hashData)
-
-	powValue := binary.BigEndian.Uint64(resultHash[0:8])
-
-	target := CalculateTarget(payloadLength, ttl, data)
-
-	return powValue <= target
-}
-
 // DoSequential does the PoW sequentially and returns the nonce value.
-func DoSequential(target uint64, initialHash []byte) uint64 {
+func DoSequential(target uint64, initialHash []byte) Nonce {
 	var nonce uint64
 	nonceBytes := make([]byte, 8)
 	trialValue := uint64(math.MaxUint64)
@@ -62,14 +38,14 @@ func DoSequential(target uint64, initialHash []byte) uint64 {
 		resultHash := bmutil.DoubleSha512(append(nonceBytes, initialHash...))
 		trialValue = binary.BigEndian.Uint64(resultHash[:8])
 	}
-	return nonce
+	return Nonce(nonce)
 }
 
 // DoParallel does the POW using parallelCount number of goroutines and returns
 // the nonce value.
-func DoParallel(target uint64, initialHash []byte, parallelCount int) uint64 {
+func DoParallel(target uint64, initialHash []byte, parallelCount int) Nonce {
 	done := make(chan bool)
-	nonceValue := make(chan uint64, 1)
+	nonceValue := make(chan Nonce, 1)
 
 	for i := 0; i < parallelCount; i++ {
 		go func(j int) {
@@ -89,7 +65,7 @@ func DoParallel(target uint64, initialHash []byte, parallelCount int) uint64 {
 					trialValue = binary.BigEndian.Uint64(resultHash[:8])
 				}
 			}
-			nonceValue <- nonce
+			nonceValue <- Nonce(nonce)
 			close(done)
 		}(i)
 	}

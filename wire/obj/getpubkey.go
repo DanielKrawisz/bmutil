@@ -12,6 +12,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
 
@@ -133,7 +134,7 @@ func (msg *GetPubKey) InventoryHash() *wire.ShaHash {
 // NewGetPubKey returns a new object message that conforms to the
 // Message interface using the passed parameters and defaults for the remaining
 // fields.
-func NewGetPubKey(nonce uint64, expiration time.Time, version, streamNumber uint64,
+func NewGetPubKey(nonce pow.Nonce, expiration time.Time, version, streamNumber uint64,
 	ripe *wire.RipeHash, tag *wire.ShaHash) *GetPubKey {
 
 	// Limit the timestamp to one second precision since the protocol

@@ -2,9 +2,11 @@ package wire_test
 
 import (
 	"bytes"
+	"encoding/hex"
 	"testing"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/fixed"
 	"github.com/DanielKrawisz/bmutil/wire/obj"
@@ -54,9 +56,9 @@ func TestObjectTypeString(t *testing.T) {
 // It is not necessary to test separate cases for different object types.
 func TestEncodeAndDecodeObjectHeader(t *testing.T) {
 	tests := []*wire.ObjectHeader{
-		wire.NewObjectHeader(123, time.Now(), wire.ObjectType(0), 0, 1),
-		wire.NewObjectHeader(8390, time.Now().Add(-37*time.Hour), wire.ObjectType(66), 33, 17),
-		wire.NewObjectHeader(65, time.Now().Add(5*time.Second), wire.ObjectType(2), 2, 8),
+		wire.NewObjectHeader(pow.Nonce(123), time.Now(), wire.ObjectType(0), 0, 1),
+		wire.NewObjectHeader(pow.Nonce(8390), time.Now().Add(-37*time.Hour), wire.ObjectType(66), 33, 17),
+		wire.NewObjectHeader(pow.Nonce(65), time.Now().Add(5*time.Second), wire.ObjectType(2), 2, 8),
 	}
 
 	for i, test := range tests {
@@ -164,6 +166,56 @@ func TestEncodeAndDecodeErrors(t *testing.T) {
 		124, 125, 126, 127, 128, 129})
 	if obj.Encode(w) == nil {
 		t.Error("object Encode should have returned an error.")
+	}
+}
+
+func TestCheck(t *testing.T) {
+	type test struct {
+		payload string
+	}
+
+	data := pow.Data{
+		NonceTrialsPerByte: 1000,
+		ExtraBytes:         1000,
+	}
+
+	tests := []test{
+		{"000000000592A44000000000555F535F00000000030100D6CFC4F94AA8BEE568985B6650029733726ED3"},
+		{"0000000000AFFFE700000000555F933400000000020100FE3ACFAE81F900ACB3FD28867750ACC0549DFE"},
+		{"000000000245D15D00000000555F68C9000000000201003A210C6F3CDE297BD5A9D1BE22822F4BB3A124"},
+		{"0000000000AA5FA800000000556B4D0200000000020100FE3ACFAE81F900ACB3FD28867750ACC0549DFE"},
+		{"00000000007F8DE2000000005565C0F500000000020100FE3ACFAE81F900ACB3FD28867750ACC0549DFE"},
+		{"0000000007D99E61000000005566AAA1000000000201000077FB004DFF82E4A76A279E0E3A6D722298A0"},
+		{"000000000011935E00000000556D5FC00000000003010000AC0291E93F1E2380EA43C63DE826165D3AA2"},
+		{"0000000000A8B73B00000000556D5ECE0000000003010076B2303F3C2926BABD723BE8C04C298D0291FE"},
+		{"0000000000CFC8B500000000556F55860000000003010056506CB580AFDA208A10A2349ADE34A7FBD7E3"},
+		{"00000000018C66A200000000556D5E3000000000030100036CD13F16FB3E8D2A49E17CD605F7423F5621"},
+	}
+	refTime := time.Unix(1432295555, 0) // 22 May 2015, 5:22 PM IST
+	for n, tc := range tests {
+		b, _ := hex.DecodeString(tc.payload)
+		msg, _ := wire.DecodeMsgObject(b)
+		if !msg.CheckPow(data, refTime) {
+			t.Errorf("for test #%d check returned false", n)
+		}
+
+		// change nonce
+		header := msg.Header()
+		header.Nonce = 0x00
+		newMsg := wire.NewMsgObject(header, msg.Payload())
+
+		if newMsg.CheckPow(data, refTime) {
+			t.Errorf("for test #%d check returned true", n)
+		}
+	}
+
+	refTime = time.Unix(1434714755, 0) // +28 days
+	for n, tc := range tests {
+		b, _ := hex.DecodeString(tc.payload)
+		msg, _ := wire.DecodeMsgObject(b)
+		if msg.CheckPow(data, refTime) {
+			t.Errorf("for test #%d check returned true", n)
+		}
 	}
 }
 

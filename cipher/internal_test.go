@@ -108,7 +108,7 @@ func (b *Message) SetMessage(n *Message) {
 	b.msg = n.msg
 }
 
-func tstNewExtendedPubKey(nonce uint64, expires time.Time, streamNumber uint64,
+func tstNewExtendedPubKey(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 	behavior uint32, signingKey, encKey *wire.PubKey, nonceTrials,
 	extraBytes uint64, signature []byte) *obj.ExtendedPubKey {
 
@@ -119,7 +119,7 @@ func tstNewExtendedPubKey(nonce uint64, expires time.Time, streamNumber uint64,
 		}, signature)
 }
 
-func tstNewDecryptedPubKey(nonce uint64, expires time.Time, streamNumber uint64,
+func tstNewDecryptedPubKey(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 	behavior uint32, signingKey, encryptKey *wire.PubKey, nonceTrials,
 	extraBytes uint64, signature []byte, tag *wire.ShaHash, encrypted []byte) *decryptedPubKey {
 	return &decryptedPubKey{
@@ -137,7 +137,7 @@ func tstNewDecryptedPubKey(nonce uint64, expires time.Time, streamNumber uint64,
 	}
 }
 
-func TstNewExtendedPubKey(nonce uint64, expires time.Time, streamNumber uint64,
+func TstNewExtendedPubKey(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 	behavior uint32, signingKey, encKey *wire.PubKey, nonceTrials,
 	extraBytes uint64, private *identity.Private) *obj.ExtendedPubKey {
 
@@ -151,7 +151,7 @@ func TstNewExtendedPubKey(nonce uint64, expires time.Time, streamNumber uint64,
 	return ep
 }
 
-func TstNewDecryptedPubKey(nonce uint64, expires time.Time, streamNumber uint64,
+func TstNewDecryptedPubKey(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 	behavior uint32, signingKey, encKey *wire.PubKey, nonceTrials, extraBytes uint64,
 	signature []byte, tag *wire.ShaHash, encrypted []byte, private *identity.Private) PubKey {
 
@@ -176,7 +176,7 @@ func (tb *TstBroadcast) EncodeForSigning(w io.Writer) error {
 	return broadcastEncodeForSigning(w, tb.i, tb.Data)
 }
 
-func TstNewBroadcast(nonce uint64, expires time.Time, streamNumber uint64,
+func TstNewBroadcast(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 	tag *wire.ShaHash, encrypted []byte, fromAddressVersion, fromStreamNumber uint64,
 	behavior uint32, signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes,
 	encoding uint64, message, signature []byte, private *identity.Private) (*Broadcast, *TstBroadcast) {
@@ -288,7 +288,7 @@ func TstGenerateBroadcastErrorData(validPubkey *wire.PubKey) (invSigningKey,
 	return
 }
 
-func TstNewMessage(nonce uint64, expires time.Time, streamNumber uint64,
+func TstNewMessage(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 	encrypted []byte, addressVersion, fromStreamNumber uint64, behavior uint32,
 	signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes uint64,
 	destination *wire.RipeHash, encoding uint64,

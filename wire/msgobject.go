@@ -7,12 +7,15 @@ package wire
 
 import (
 	"bytes"
+	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
+	"time"
 
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/pow"
 )
 
 const (
@@ -102,6 +105,28 @@ func (msg *MsgObject) Payload() []byte {
 // MsgObject transforms the PubKeyObject to a *MsgObject.
 func (msg *MsgObject) MsgObject() *MsgObject {
 	return msg
+}
+
+// Check checks if the POW that was done for an object message is sufficient.
+// obj is a byte slice containing the object message.
+func (msg *MsgObject) CheckPow(data pow.Data, refTime time.Time) bool {
+	// calculate ttl from bytes 8-16 that contain ExpiresTime
+	ttl := uint64(msg.Header().Expiration().Unix() - refTime.Unix())
+
+	obj := EncodeMessage(msg)
+	msgHash := bmutil.Sha512(obj[8:]) // exclude nonce value in the beginning
+	payloadLength := uint64(len(obj))
+
+	hashData := make([]byte, 8+len(msgHash))
+	copy(hashData[:8], obj[:8]) // nonce
+	copy(hashData[8:], msgHash)
+	resultHash := bmutil.DoubleSha512(hashData)
+
+	powValue := binary.BigEndian.Uint64(resultHash[0:8])
+
+	target := pow.CalculateTarget(payloadLength, ttl, data)
+
+	return powValue <= target
 }
 
 // InventoryHash takes double sha512 of the bytes and returns the first half.
