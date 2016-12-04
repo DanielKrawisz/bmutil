@@ -9,6 +9,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/format"
 	"github.com/DanielKrawisz/bmutil/identity"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
@@ -196,6 +197,11 @@ func TstNewBroadcast(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 		i = &incompleteTaglessBroadcast{expires, stream}
 	}
 
+	content, err := format.Read(encoding, message)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	data := &Bitmessage{
 		FromAddressVersion: fromAddressVersion,
 		FromStreamNumber:   fromStreamNumber,
@@ -206,8 +212,7 @@ func TstNewBroadcast(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 			NonceTrialsPerByte: nonceTrials,
 			ExtraBytes:         extraBytes,
 		},
-		Encoding: encoding,
-		Message:  message,
+		Content: content,
 	}
 
 	return &Broadcast{
@@ -227,6 +232,11 @@ func TstBroadcastEncryptParams(expires time.Time, streamNumber uint64,
 	behavior uint32, signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes,
 	encoding uint64, message []byte, private *identity.Private) (time.Time, *Bitmessage, *wire.ShaHash, *identity.Private) {
 
+	content, err := format.Read(encoding, message)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	return expires, &Bitmessage{
 		FromAddressVersion: fromAddressVersion,
 		FromStreamNumber:   fromStreamNumber,
@@ -237,8 +247,7 @@ func TstBroadcastEncryptParams(expires time.Time, streamNumber uint64,
 			NonceTrialsPerByte: nonceTrials,
 			ExtraBytes:         extraBytes,
 		},
-		Encoding: encoding,
-		Message:  message,
+		Content: content,
 	}, tag, private
 }
 
@@ -296,6 +305,11 @@ func TstNewMessage(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 
 	msg := obj.NewMessage(nonce, expires, streamNumber, encrypted)
 
+	content, err := format.Read(encoding, message)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	return &Message{
 		msg: msg,
 		data: &Bitmessage{
@@ -309,8 +323,7 @@ func TstNewMessage(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 				ExtraBytes:         extraBytes,
 			},
 			Destination: destination,
-			Encoding:    encoding,
-			Message:     message,
+			Content:     content,
 		},
 		ack:       ack,
 		signature: signature,
@@ -339,6 +352,11 @@ func TstSignAndEncryptMessage(nonce uint64, expires time.Time, streamNumber uint
 		panic("Test setup err D")
 	}
 
+	content, err := format.Read(encoding, message)
+	if err != nil {
+		panic(err.Error())
+	}
+
 	data := &Bitmessage{
 		FromAddressVersion: addressVersion,
 		FromStreamNumber:   fromStreamNumber,
@@ -350,8 +368,7 @@ func TstSignAndEncryptMessage(nonce uint64, expires time.Time, streamNumber uint
 			ExtraBytes:         extraBytes,
 		},
 		Destination: destination,
-		Encoding:    encoding,
-		Message:     message,
+		Content:     content,
 	}
 
 	return SignAndEncryptMessage(expires, streamNumber, data, ack, privID, pubID)

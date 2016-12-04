@@ -5,10 +5,10 @@
 package cipher
 
 import (
-	"fmt"
 	"io"
 
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/format"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
@@ -23,8 +23,7 @@ type Bitmessage struct {
 	EncryptionKey      *wire.PubKey
 	Pow                *pow.Data
 	Destination        *wire.RipeHash
-	Encoding           uint64
-	Message            []byte
+	Content            format.Encoding
 }
 
 // encodeMessage encodes a Bitmessage so that it can be encrypted.
@@ -47,17 +46,7 @@ func (msg *Bitmessage) encodeMessage(w io.Writer) error {
 	if err = wire.WriteElement(w, msg.Destination); err != nil {
 		return err
 	}
-	if err = bmutil.WriteVarInt(w, msg.Encoding); err != nil {
-		return err
-	}
-	msgLength := uint64(len(msg.Message))
-	if err = bmutil.WriteVarInt(w, msgLength); err != nil {
-		return err
-	}
-	if _, err := w.Write(msg.Message); err != nil {
-		return err
-	}
-	return nil
+	return format.Encode(w, msg.Content)
 }
 
 // encodeBroadcast encodes a Bitmessage so that it can be encrypted.
@@ -77,17 +66,7 @@ func (msg *Bitmessage) encodeBroadcast(w io.Writer) error {
 			return err
 		}
 	}
-	if err = bmutil.WriteVarInt(w, msg.Encoding); err != nil {
-		return err
-	}
-	msgLength := uint64(len(msg.Message))
-	if err = bmutil.WriteVarInt(w, msgLength); err != nil {
-		return err
-	}
-	if _, err := w.Write(msg.Message); err != nil {
-		return err
-	}
-	return nil
+	return format.Encode(w, msg.Content)
 }
 
 // decodeMessage decodes a Bitmessage from its decrypted form.
@@ -115,24 +94,11 @@ func (msg *Bitmessage) decodeMessage(r io.Reader) error {
 	if err = wire.ReadElement(r, msg.Destination); err != nil {
 		return err
 	}
-	if msg.Encoding, err = bmutil.ReadVarInt(r); err != nil {
+
+	if msg.Content, err = format.Decode(r); err != nil {
 		return err
 	}
-	var msgLength uint64
-	if msgLength, err = bmutil.ReadVarInt(r); err != nil {
-		return err
-	}
-	if msgLength > wire.MaxPayloadOfMsgObject {
-		str := fmt.Sprintf("message length exceeds max length - "+
-			"indicates %d, but max length is %d",
-			msgLength, wire.MaxPayloadOfMsgObject)
-		return wire.NewMessageError("DecodeFromDecrypted", str)
-	}
-	msg.Message = make([]byte, msgLength)
-	_, err = io.ReadFull(r, msg.Message)
-	if err != nil {
-		return err
-	}
+
 	return nil
 }
 
@@ -157,22 +123,8 @@ func (msg *Bitmessage) decodeBroadcast(r io.Reader) error {
 			return err
 		}
 	}
-	if msg.Encoding, err = bmutil.ReadVarInt(r); err != nil {
-		return err
-	}
-	var msgLength uint64
-	if msgLength, err = bmutil.ReadVarInt(r); err != nil {
-		return err
-	}
-	if msgLength > wire.MaxPayloadOfMsgObject {
-		str := fmt.Sprintf("message length exceeds max length - "+
-			"indicates %d, but max length is %d",
-			msgLength, wire.MaxPayloadOfMsgObject)
-		return wire.NewMessageError("DecodeFromDecrypted", str)
-	}
-	msg.Message = make([]byte, msgLength)
-	_, err = io.ReadFull(r, msg.Message)
-	if err != nil {
+
+	if msg.Content, err = format.Decode(r); err != nil {
 		return err
 	}
 	return nil
