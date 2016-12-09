@@ -74,9 +74,10 @@ func TestObject(t *testing.T) {
 	msgEncryptedPubKey := obj.NewEncryptedPubKey(123123, expires, 1, &tag, []byte{1, 2, 3, 4, 5})
 
 	enc := make([]byte, 99)
-	msgMsg := obj.NewMessage(123123, expires, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
+	msgMsg := obj.NewMessage(123123, expires, 1, enc)
 
-	msgBroadcast := obj.NewBroadcast(123123, expires, 2, 1, nil, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
+	msgTaglessBroadcast := obj.NewTaglessBroadcast(123123, expires, 1, enc)
+	msgTaggedBroadcast := obj.NewTaggedBroadcast(123123, expires, 1, &tag, enc)
 
 	tests := []struct {
 		in    obj.Object         // Value to encode
@@ -89,7 +90,8 @@ func TestObject(t *testing.T) {
 		{msgExtendedPubKey, msgExtendedPubKey, wire.MainNet, 178 + 6},
 		{msgEncryptedPubKey, msgEncryptedPubKey, wire.MainNet, 83},
 		{msgMsg, msgMsg, wire.MainNet, 145},
-		{msgBroadcast, msgBroadcast, wire.MainNet, 145},
+		{msgTaglessBroadcast, msgTaglessBroadcast, wire.MainNet, 145},
+		{msgTaggedBroadcast, msgTaggedBroadcast, wire.MainNet, 145 + 32},
 	}
 
 	t.Logf("Running %d tests", len(tests))

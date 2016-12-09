@@ -20,6 +20,11 @@ const (
 	extraBytes  = 1000
 )
 
+var data pow.Data = pow.Data{
+	NonceTrialsPerByte: nonceTrials,
+	ExtraBytes:         extraBytes,
+}
+
 func TestCalculateTarget(t *testing.T) {
 	type test struct {
 		payloadLen  uint64
@@ -47,8 +52,7 @@ func TestCalculateTarget(t *testing.T) {
 	}
 
 	for n, tc := range tests {
-		target := pow.CalculateTarget(tc.payloadLen, tc.ttl,
-			nonceTrials, extraBytes)
+		target := pow.CalculateTarget(tc.payloadLen, tc.ttl, data)
 		if target != tc.targetValue {
 			t.Errorf("for test #%d got %d expected %d", n, target,
 				tc.targetValue)
@@ -115,7 +119,7 @@ func TestCheck(t *testing.T) {
 	for n, tc := range tests {
 		b, _ := hex.DecodeString(tc.payload)
 		msg, _ := wire.DecodeMsgObject(b)
-		if !pow.Check(msg, nonceTrials, extraBytes, refTime) {
+		if !pow.Check(msg, data, refTime) {
 			t.Errorf("for test #%d check returned false", n)
 		}
 
@@ -124,7 +128,7 @@ func TestCheck(t *testing.T) {
 		header.Nonce = 0x00
 		newMsg := wire.NewMsgObject(header, msg.Payload())
 
-		if pow.Check(newMsg, nonceTrials, extraBytes, refTime) {
+		if pow.Check(newMsg, data, refTime) {
 			t.Errorf("for test #%d check returned true", n)
 		}
 	}
@@ -133,7 +137,7 @@ func TestCheck(t *testing.T) {
 	for n, tc := range tests {
 		b, _ := hex.DecodeString(tc.payload)
 		msg, _ := wire.DecodeMsgObject(b)
-		if pow.Check(msg, nonceTrials, extraBytes, refTime) {
+		if pow.Check(msg, data, refTime) {
 			t.Errorf("for test #%d check returned true", n)
 		}
 	}

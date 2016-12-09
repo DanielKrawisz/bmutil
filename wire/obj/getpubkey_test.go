@@ -39,11 +39,6 @@ func TestGetPubKey(t *testing.T) {
 			"got %v, want %v", maxPayload, wantPayload)
 	}
 
-	str := msg.String()
-	if str[:9] != "getpubkey" {
-		t.Errorf("String representation: got %v, want %v", str[:9], "getpubkey")
-	}
-
 	return
 }
 
@@ -148,9 +143,9 @@ func TestGetPubKeyWire(t *testing.T) {
 func TestGetPubKeyWireError(t *testing.T) {
 	wireErr := &wire.MessageError{}
 
-	baseGetPubKey := obj.BaseGetPubKey()
-	tagGetPubKey := obj.TagGetPubKey()
-	invalidGetPubKeyVersion := obj.InvalidGetPubKeyVersion()
+	baseGetPubKey := obj.TstBaseGetPubKey()
+	tagGetPubKey := obj.TstTagGetPubKey()
+	invalidGetPubKeyVersion := obj.TstInvalidGetPubKeyVersion()
 
 	tests := []struct {
 		in       *obj.GetPubKey // Value to encode

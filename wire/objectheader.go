@@ -74,10 +74,10 @@ func (h *ObjectHeader) EncodeForSigning(w io.Writer) error {
 	return nil
 }
 
-// DecodeMsgObjectHeader decodes the object header from given reader. Object
+// DecodeObjectHeader decodes the object header from given reader. Object
 // header consists of Nonce, ExpiresTime, ObjectType, Version and Stream, in
 // that order. Read Protocol Specifications for more information.
-func DecodeMsgObjectHeader(r io.Reader) (*ObjectHeader, error) {
+func DecodeObjectHeader(r io.Reader) (*ObjectHeader, error) {
 	var header ObjectHeader
 	err := ReadElements(r, &header.Nonce, &header.ExpiresTime, &header.ObjectType)
 	if err != nil {

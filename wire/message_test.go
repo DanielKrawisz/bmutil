@@ -101,9 +101,9 @@ func TestMessage(t *testing.T) {
 	msgPubKey := obj.NewSimplePubKey(123123, expires, 1, 0, pub1, pub2)
 
 	enc := make([]byte, 99)
-	msgMsg := obj.NewMessage(123123, expires, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
+	msgMsg := obj.NewMessage(123123, expires, 1, enc)
 
-	msgBroadcast := obj.NewBroadcast(123123, expires, 2, 1, nil, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
+	msgBroadcast := obj.NewTaglessBroadcast(123123, expires, 1, enc)
 
 	tests := []struct {
 		in    wire.Message       // Value to encode

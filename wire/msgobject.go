@@ -47,7 +47,7 @@ type MsgObject struct {
 // This is part of the Message interface implementation.
 func (msg *MsgObject) Decode(r io.Reader) error {
 	var err error
-	msg.header, err = DecodeMsgObjectHeader(r)
+	msg.header, err = DecodeObjectHeader(r)
 	if err != nil {
 		return err
 	}

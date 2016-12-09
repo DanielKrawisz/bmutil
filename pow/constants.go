@@ -17,3 +17,9 @@ const (
 	// messages a little more difficult.
 	DefaultExtraBytes = 1000
 )
+
+// DefaultData puts the default values together in one Data struct.
+var DefaultData = Data{
+	NonceTrialsPerByte: DefaultNonceTrialsPerByte,
+	ExtraBytes:         DefaultExtraBytes,
+}

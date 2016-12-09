@@ -39,8 +39,7 @@ func (id *Public) hash() []byte {
 }
 
 // NewPublic creates and initializes an *identity.Public object.
-func NewPublic(signingKey, encryptionKey *btcec.PublicKey, nonceTrials,
-	extraBytes, addrVersion, addrStream uint64) *Public {
+func NewPublic(signingKey, encryptionKey *btcec.PublicKey, data *pow.Data, addrVersion, addrStream uint64) *Public {
 
 	id := &Public{
 		EncryptionKey: encryptionKey,
@@ -49,10 +48,15 @@ func NewPublic(signingKey, encryptionKey *btcec.PublicKey, nonceTrials,
 	// set values appropriately; note that Go zero-initializes everything
 	// so if version is 2, we should have 0 in msg.ExtraBytes and
 	// msg.NonceTrials
-	id.NonceTrialsPerByte = uint64(math.Max(float64(pow.DefaultNonceTrialsPerByte),
-		float64(nonceTrials)))
-	id.ExtraBytes = uint64(math.Max(float64(pow.DefaultExtraBytes),
-		float64(extraBytes)))
+	if data == nil {
+		id.NonceTrialsPerByte = pow.DefaultNonceTrialsPerByte
+		id.ExtraBytes = pow.DefaultExtraBytes
+	} else {
+		id.NonceTrialsPerByte = uint64(math.Max(float64(pow.DefaultNonceTrialsPerByte),
+			float64(data.NonceTrialsPerByte)))
+		id.ExtraBytes = uint64(math.Max(float64(pow.DefaultExtraBytes),
+			float64(data.ExtraBytes)))
+	}
 	id.CreateAddress(addrVersion, addrStream)
 
 	return id

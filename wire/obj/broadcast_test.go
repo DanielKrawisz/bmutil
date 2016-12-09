@@ -24,19 +24,20 @@ func TestBroadcast(t *testing.T) {
 	// Ensure the command is expected value.
 	now := time.Now()
 	enc := make([]byte, 99)
-	msg := obj.NewBroadcast(83928, now, 2, 1, nil, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
-
-	// Ensure max payload is expected value for latest protocol version.
-	wantPayload := wire.MaxPayloadOfMsgObject
-	maxPayload := msg.MaxPayloadLength()
-	if maxPayload != wantPayload {
-		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"- got %v, want %v", maxPayload, wantPayload)
+	var tag wire.ShaHash
+	msgs := []wire.Message{
+		obj.NewTaglessBroadcast(83928, now, 1, enc),
+		obj.NewTaggedBroadcast(83928, now, 1, &tag, enc),
 	}
 
-	str := msg.String()
-	if str[:9] != "broadcast" {
-		t.Errorf("String representation: got %v, want %v", str[:9], "broadcast")
+	for _, msg := range msgs {
+		// Ensure max payload is expected value for latest protocol version.
+		wantPayload := wire.MaxPayloadOfMsgObject
+		maxPayload := msg.MaxPayloadLength()
+		if maxPayload != wantPayload {
+			t.Errorf("MaxPayloadLength: wrong max payload length for "+
+				"- got %v, want %v", maxPayload, wantPayload)
+		}
 	}
 
 	return
@@ -47,30 +48,31 @@ func TestBroadcast(t *testing.T) {
 func TestBroadcastWire(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	enc := make([]byte, 128)
-	msgBase := obj.NewBroadcast(83928, expires, 2, 1, nil, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
+	msgBase := obj.NewTaglessBroadcast(83928, expires, 1, enc)
 
-	m := make([]byte, 32)
-	a := make([]byte, 8)
 	tagBytes := make([]byte, 32)
 	tag, err := wire.NewShaHash(tagBytes)
 	if err != nil {
 		t.Fatalf("could not make a sha hash %s", err)
 	}
-	msgTagged := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 1, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
-	msgBaseAndTag := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 0, 0, 0, nil, nil, 0, 0, 0, nil, nil)
+	msgTagged := obj.NewTaggedBroadcast(83928, expires, 1, tag, enc)
+	msgBaseAndTag := obj.NewTaggedBroadcast(83928, expires, 1, tag, enc)
 
 	tests := []struct {
-		in  *obj.Broadcast // Message to encode
-		out *obj.Broadcast // Expected decoded message
-		buf []byte         // Wire encoding
+		base obj.Object // Base message to decode from.
+		in   obj.Object // Message to encode
+		out  obj.Object // Expected decoded message
+		buf  []byte     // Wire encoding
 	}{
 		// Latest protocol version with multiple object vectors.
 		{
+			&obj.TaglessBroadcast{},
 			msgBase,
 			msgBase,
 			baseBroadcastEncoded,
 		},
 		{
+			&obj.TaggedBroadcast{},
 			msgTagged,
 			msgBaseAndTag,
 			tagBroadcastEncoded,
@@ -93,16 +95,15 @@ func TestBroadcastWire(t *testing.T) {
 		}
 
 		// Decode the message from wire.format.
-		var msg obj.Broadcast
 		rbuf := bytes.NewReader(test.buf)
-		err = msg.Decode(rbuf)
+		err = test.base.Decode(rbuf)
 		if err != nil {
 			t.Errorf("Decode #%d error %v", i, err)
 			continue
 		}
-		if !reflect.DeepEqual(&msg, test.out) {
+		if !reflect.DeepEqual(test.base, test.out) {
 			t.Errorf("Decode #%d\n got: %s want: %s", i,
-				spew.Sdump(msg), spew.Sdump(test.out))
+				spew.Sdump(test.base), spew.Sdump(test.out))
 			continue
 		}
 	}
@@ -116,30 +117,31 @@ func TestBroadcastWireError(t *testing.T) {
 	copy(wrongObjectTypeEncoded, baseMsgEncoded)
 	wrongObjectTypeEncoded[19] = 0
 
-	baseBroadcast := obj.BaseBroadcast()
-	taggedBroadcast := obj.TaggedBroadcast()
+	baseBroadcast := obj.TstTaglessBroadcast()
+	taggedBroadcast := obj.TstTaggedBroadcast()
 
 	tests := []struct {
-		in       *obj.Broadcast // Value to encode
-		buf      []byte         // Wire encoding
-		max      int            // Max size of fixed buffer to induce errors
-		writeErr error          // Expected write error
-		readErr  error          // Expected read error
+		base     obj.Object // Value to decode
+		in       obj.Object // Value to encode
+		buf      []byte     // Wire encoding
+		max      int        // Max size of fixed buffer to induce errors
+		writeErr error      // Expected write error
+		readErr  error      // Expected read error
 	}{
 		// Force error in nonce
-		{baseBroadcast, baseBroadcastEncoded, 0, io.ErrShortWrite, io.EOF},
+		{&obj.TaglessBroadcast{}, baseBroadcast, baseBroadcastEncoded, 0, io.ErrShortWrite, io.EOF},
 		// Force error in expirestime.
-		{baseBroadcast, baseBroadcastEncoded, 8, io.ErrShortWrite, io.EOF},
+		{&obj.TaglessBroadcast{}, baseBroadcast, baseBroadcastEncoded, 8, io.ErrShortWrite, io.EOF},
 		// Force error in object type.
-		{baseBroadcast, baseBroadcastEncoded, 16, io.ErrShortWrite, io.EOF},
+		{&obj.TaglessBroadcast{}, baseBroadcast, baseBroadcastEncoded, 16, io.ErrShortWrite, io.EOF},
 		// Force error in version.
-		{baseBroadcast, baseBroadcastEncoded, 20, io.ErrShortWrite, io.EOF},
+		{&obj.TaglessBroadcast{}, baseBroadcast, baseBroadcastEncoded, 20, io.ErrShortWrite, io.EOF},
 		// Force error in stream number.
-		{baseBroadcast, baseBroadcastEncoded, 21, io.ErrShortWrite, io.EOF},
+		{&obj.TaglessBroadcast{}, baseBroadcast, baseBroadcastEncoded, 21, io.ErrShortWrite, io.EOF},
 		// Force error object type validation.
-		{baseBroadcast, wrongObjectTypeEncoded, 52, io.ErrShortWrite, wireErr},
+		{&obj.TaglessBroadcast{}, baseBroadcast, wrongObjectTypeEncoded, 52, io.ErrShortWrite, wireErr},
 		// Force error in tag.
-		{taggedBroadcast, tagBroadcastEncoded, 22, io.ErrShortWrite, io.EOF},
+		{&obj.TaggedBroadcast{}, taggedBroadcast, tagBroadcastEncoded, 22, io.ErrShortWrite, io.EOF},
 	}
 
 	t.Logf("Running %d tests", len(tests))
@@ -164,9 +166,8 @@ func TestBroadcastWireError(t *testing.T) {
 		}
 
 		// Decode from wire.format.
-		var msg obj.Broadcast
 		buf := bytes.NewBuffer(test.buf[0:test.max])
-		err = msg.Decode(buf)
+		err = test.base.Decode(buf)
 		if reflect.TypeOf(err) != reflect.TypeOf(test.readErr) {
 			t.Errorf("Decode #%d wrong error got: %v, want: %v",
 				i, err, test.readErr)
@@ -185,261 +186,12 @@ func TestBroadcastWireError(t *testing.T) {
 	}
 }
 
-// TestBroadcastEnrcypt tests the Broadcast wire.EncodeForEncryption and
-// DecodeForEncryption for various versions.
-func TestBroadcastEncrypt(t *testing.T) {
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	enc := make([]byte, 128)
-
-	m := make([]byte, 32)
-	a := make([]byte, 8)
-	tagBytes := make([]byte, 32)
-	tag, err := wire.NewShaHash(tagBytes)
-	if err != nil {
-		t.Fatalf("could not make a sha hash %s", err)
-	}
-	msgTagged := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
-
-	tests := []struct {
-		in  *obj.Broadcast // Message to encode
-		out *obj.Broadcast // Expected decoded message
-		buf []byte         // Wire encoding
-	}{
-		// Latest protocol version with multiple object vectors.
-		{
-			msgTagged,
-			msgTagged,
-			broadcastEncodedForEncryption,
-		},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// Encode the message to wire.format.
-		var buf bytes.Buffer
-		err := test.in.EncodeForEncryption(&buf)
-		if err != nil {
-			t.Errorf("Encode #%d error %v", i, err)
-			continue
-		}
-		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("EncodeForEncryption #%d\n got: %s want: %s", i,
-				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
-			continue
-		}
-
-		// Decode the message from wire.format.
-		var msg obj.Broadcast
-		rbuf := bytes.NewReader(test.buf)
-		err = msg.DecodeFromDecrypted(rbuf)
-		if err != nil {
-			t.Errorf("DecodeFromDecrypted #%d error %v", i, err)
-			continue
-		}
-
-		// Copy the fields that are not written by DecodeFromDecrypted
-		msg.SetHeader(test.in.Header())
-		msg.Tag = test.in.Tag
-		msg.Encrypted = test.in.Encrypted
-
-		if !reflect.DeepEqual(&msg, test.out) {
-			t.Errorf("DecodeFromDecrypted #%d\n got: %s want: %s", i,
-				spew.Sdump(&msg), spew.Sdump(test.out))
-			continue
-		}
-	}
-}
-
-// TestBroadcastEncryptError tests the Broadcast error paths
-func TestBroadcastEncryptError(t *testing.T) {
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	enc := make([]byte, 128)
-
-	m := make([]byte, 32)
-	a := make([]byte, 8)
-	tagBytes := make([]byte, 32)
-	tag, err := wire.NewShaHash(tagBytes)
-	if err != nil {
-		t.Fatalf("could not make a sha hash %s", err)
-	}
-	msgTagged := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
-
-	tests := []struct {
-		in  *obj.Broadcast // Value to encode
-		buf []byte         // Wire encoding
-		max int            // Max size of fixed buffer to induce errors
-	}{
-		// Force error in FromAddressVersion
-		{msgTagged, broadcastEncodedForEncryption, 0},
-		// Force error in FromSteamNumber
-		{msgTagged, broadcastEncodedForEncryption, 1},
-		// Force error in behavior.
-		{msgTagged, broadcastEncodedForEncryption, 8},
-		// Force error in NonceTrials.
-		{msgTagged, broadcastEncodedForEncryption, 134},
-		// Force error in ExtraBytes.
-		{msgTagged, broadcastEncodedForEncryption, 137},
-		// Force error in Encoding.
-		{msgTagged, broadcastEncodedForEncryption, 140},
-		// Force error in message length.
-		{msgTagged, broadcastEncodedForEncryption, 141},
-		// Force error in message.
-		{msgTagged, broadcastEncodedForEncryption, 142},
-		// Force error in sig length.
-		{msgTagged, broadcastEncodedForEncryption, 174},
-		// Force error in signature.
-		{msgTagged, broadcastEncodedForEncryption, 175},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// EncodeForEncryption.
-		w := fixed.NewWriter(test.max)
-		err := test.in.EncodeForEncryption(w)
-		if err == nil {
-			t.Errorf("EncodeForEncryption #%d no error returned", i)
-			continue
-		}
-
-		// DecodeFromDecrypted.
-		var msg obj.Broadcast
-		buf := bytes.NewBuffer(test.buf[0:test.max])
-		err = msg.DecodeFromDecrypted(buf)
-		if err == nil {
-			t.Errorf("DecodeFromDecrypted #%d no error returned", i)
-			continue
-		}
-	}
-
-	// Try to decode too long a message.
-	var msg obj.Broadcast
-	broadcastEncodedForEncryption[141] = 0xff
-	broadcastEncodedForEncryption[142] = 200
-	broadcastEncodedForEncryption[143] = 200
-	buf := bytes.NewBuffer(broadcastEncodedForEncryption)
-	err = msg.DecodeFromDecrypted(buf)
-	if err == nil {
-		t.Error("EncodeForEncryption should have returned an error for too long a message length.")
-	}
-	broadcastEncodedForEncryption[141] = 32
-	broadcastEncodedForEncryption[142] = 0
-	broadcastEncodedForEncryption[143] = 0
-
-	// Try to decode a message with too long of a signature.
-	broadcastEncodedForEncryption[174] = 0xff
-	broadcastEncodedForEncryption[175] = 200
-	broadcastEncodedForEncryption[176] = 200
-	buf = bytes.NewBuffer(broadcastEncodedForEncryption)
-	err = msg.DecodeFromDecrypted(buf)
-	if err == nil {
-		t.Error("EncodeForEncryption should have returned an error for too long a message length.")
-	}
-	broadcastEncodedForEncryption[174] = 8
-	broadcastEncodedForEncryption[175] = 0
-	broadcastEncodedForEncryption[176] = 0
-}
-
-// TestBroadcastEnrcypt tests the Broadcast wire.EncodeForEncryption and
-// DecodeForEncryption for various versions.
-func TestBroadcastEncodeForSigning(t *testing.T) {
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	enc := make([]byte, 128)
-
-	m := make([]byte, 32)
-	a := make([]byte, 8)
-	tagBytes := make([]byte, 32)
-	tag, err := wire.NewShaHash(tagBytes)
-	if err != nil {
-		t.Fatalf("could not make a sha hash %s", err)
-	}
-	msgTagged := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
-
-	tests := []struct {
-		in  *obj.Broadcast // Message to encode
-		buf []byte         // Wire encoding
-	}{
-		// Latest protocol version with multiple object vectors.
-		{
-			msgTagged,
-			broadcastEncodedForSigning,
-		},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// Encode the message to wire.format.
-		var buf bytes.Buffer
-		err := test.in.EncodeForSigning(&buf)
-		if err != nil {
-			t.Errorf("Encode #%d error %v", i, err)
-			continue
-		}
-		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("EncodeForSigning #%d\n got: %s want: %s", i,
-				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
-			continue
-		}
-	}
-}
-
-// TestBroadcastEncryptError tests the Broadcast error paths
-func TestBroadcastEncodeForSigningError(t *testing.T) {
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	enc := make([]byte, 128)
-
-	m := make([]byte, 32)
-	a := make([]byte, 8)
-	tagBytes := make([]byte, 32)
-	tag, err := wire.NewShaHash(tagBytes)
-	if err != nil {
-		t.Fatalf("could not make a sha hash %s", err)
-	}
-	msgTagged := obj.NewBroadcast(83928, expires, 5, 1, tag, enc, 3, 1, 1, pubKey1, pubKey2, 512, 512, 0, m, a)
-
-	tests := []struct {
-		in  *obj.Broadcast // Value to encode
-		max int            // Max size of fixed buffer to induce errors
-	}{
-		// Force error in Tag
-		{msgTagged, -40},
-		// Force error in Tag
-		{msgTagged, -10},
-		// Force error in FromAddressVersion
-		{msgTagged, 0},
-		// Force error in FromSteamNumber
-		{msgTagged, 1},
-		// Force error in behavior.
-		{msgTagged, 8},
-		// Force error in NonceTrials.
-		{msgTagged, 134},
-		// Force error in ExtraBytes.
-		{msgTagged, 137},
-		// Force error in Encoding.
-		{msgTagged, 140},
-		// Force error in message length.
-		{msgTagged, 141},
-		// Force error in message.
-		{msgTagged, 142},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// EncodeForEncryption.
-		w := fixed.NewWriter(test.max + 46)
-		err := test.in.EncodeForSigning(w)
-		if err == nil {
-			t.Errorf("EncodeForSigning #%d no error returned", i)
-			continue
-		}
-	}
-}
-
 // baseBroadcastEncoded is the wire.encoded bytes for baseBroadcast (just encrypted data)
 var baseBroadcastEncoded = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce
 	0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29, // 64-bit Timestamp
 	0x00, 0x00, 0x00, 0x03, // Object Type
-	0x02, // Version
+	0x04, // Version
 	0x01, // Stream Number
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

@@ -29,10 +29,10 @@ const (
 	// sent as an encrypted ExtendedPubKey, decryptable by those who had the
 	// addresses of the owners of those keys.
 	EncryptedPubKeyVersion = 4
-	// Signature consists of 2 256-bit integers encoding using ASN.1
+	// SignatureMaxLength consists of 2 256-bit integers encoding using ASN.1
 	// 2*256/8 + 16 (safe encoding boundary). TODO find precise number. Probably
 	// 72.
-	signatureMaxLength = 80
+	SignatureMaxLength = 80
 )
 
 // PubKeyData contains the information that is transmitted in a PubKey object.
@@ -113,10 +113,10 @@ func DecodePubKeySignature(r io.Reader) (signature []byte, err error) {
 	if err != nil {
 		return
 	}
-	if sigLength > signatureMaxLength {
+	if sigLength > SignatureMaxLength {
 		str := fmt.Sprintf("signature length exceeds max length - "+
 			"indicates %d, but max length is %d",
-			sigLength, signatureMaxLength)
+			sigLength, SignatureMaxLength)
 		err = wire.NewMessageError("Decode", str)
 		return
 	}
@@ -162,7 +162,7 @@ func (p *SimplePubKey) decodePayload(r io.Reader) error {
 // in from r.
 func (p *SimplePubKey) Decode(r io.Reader) error {
 	var err error
-	p.header, err = wire.DecodeMsgObjectHeader(r)
+	p.header, err = wire.DecodeObjectHeader(r)
 	if err != nil {
 		return err
 	}
@@ -281,9 +281,8 @@ type ExtendedPubKey struct {
 }
 
 func (p *ExtendedPubKey) decodePayload(r io.Reader) error {
-	var err error
 	p.Data = &PubKeyData{}
-	err = p.Data.Decode(r)
+	err := p.Data.Decode(r)
 	if err != nil {
 		return nil
 	}
@@ -295,7 +294,7 @@ func (p *ExtendedPubKey) decodePayload(r io.Reader) error {
 // Decode decodes an ExtendedPubKey from a reader.
 func (p *ExtendedPubKey) Decode(r io.Reader) error {
 	var err error
-	p.header, err = wire.DecodeMsgObjectHeader(r)
+	p.header, err = wire.DecodeObjectHeader(r)
 	if err != nil {
 		return err
 	}
@@ -461,7 +460,7 @@ func (p *EncryptedPubKey) decodePayload(r io.Reader) error {
 // Decode decodes an EncryptedPubKey from a reader.
 func (p *EncryptedPubKey) Decode(r io.Reader) error {
 	var err error
-	p.header, err = wire.DecodeMsgObjectHeader(r)
+	p.header, err = wire.DecodeObjectHeader(r)
 	if err != nil {
 		return err
 	}
@@ -562,7 +561,7 @@ func NewEncryptedPubKey(nonce uint64, expires time.Time,
 
 // DecodePubKey takes a reader and decodes it as some kind of PubKey object.
 func DecodePubKey(r io.Reader) (Object, error) {
-	header, err := wire.DecodeMsgObjectHeader(r)
+	header, err := wire.DecodeObjectHeader(r)
 	if err != nil {
 		return nil, err
 	}
@@ -575,8 +574,7 @@ func DecodePubKey(r io.Reader) (Object, error) {
 
 	switch header.Version {
 	default:
-		str := fmt.Sprintf("Object version is %d", header.Version)
-		return nil, wire.NewMessageError("Decode", str)
+		return nil, ErrInvalidVersion
 	case SimplePubKeyVersion:
 		k := &SimplePubKey{header: header}
 		return k, k.decodePayload(r)
@@ -587,4 +585,10 @@ func DecodePubKey(r io.Reader) (Object, error) {
 		k := &EncryptedPubKey{header: header}
 		return k, k.decodePayload(r)
 	}
+}
+
+// ReadPubKey takes a byte array and and tries to read it as some kind of pubkey.
+func ReadPubKey(obj []byte) (Object, error) {
+	r := bytes.NewReader(obj)
+	return DecodePubKey(r)
 }

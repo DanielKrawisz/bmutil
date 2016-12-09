@@ -6,6 +6,7 @@ package cipher
 
 import (
 	"bytes"
+	"io"
 	"time"
 
 	"github.com/DanielKrawisz/bmutil/identity"
@@ -99,6 +100,14 @@ func TstGenerateMismatchSig() []byte {
 	return mismatchSig
 }
 
+func (b *Broadcast) SetMessage(n *Broadcast) {
+	b.msg = n.msg
+}
+
+func (b *Message) SetMessage(n *Message) {
+	b.msg = n.msg
+}
+
 func tstNewExtendedPubKey(nonce uint64, expires time.Time, streamNumber uint64,
 	behavior uint32, signingKey, encKey *wire.PubKey, nonceTrials,
 	extraBytes uint64, signature []byte) *obj.ExtendedPubKey {
@@ -154,4 +163,230 @@ func TstNewDecryptedPubKey(nonce uint64, expires time.Time, streamNumber uint64,
 	}
 
 	return dk
+}
+
+type TstBroadcast struct {
+	i         incompleteBroadcast
+	Data      *Bitmessage
+	Signature []byte
+	Private   *identity.Private
+}
+
+func (tb *TstBroadcast) EncodeForSigning(w io.Writer) error {
+	return broadcastEncodeForSigning(w, tb.i, tb.Data)
+}
+
+func TstNewBroadcast(nonce uint64, expires time.Time, streamNumber uint64,
+	tag *wire.ShaHash, encrypted []byte, fromAddressVersion, fromStreamNumber uint64,
+	behavior uint32, signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes,
+	encoding uint64, message, signature []byte, private *identity.Private) (*Broadcast, *TstBroadcast) {
+
+	var stream uint64
+	if private != nil {
+		stream = private.Address.Stream
+	}
+
+	var msg obj.Broadcast
+	var i incompleteBroadcast
+	if tag != nil {
+		msg = obj.NewTaggedBroadcast(nonce, expires, streamNumber, tag, encrypted)
+		i = &incompleteTaggedBroadcast{expires, stream, tag}
+	} else {
+		msg = obj.NewTaglessBroadcast(nonce, expires, streamNumber, encrypted)
+		i = &incompleteTaglessBroadcast{expires, stream}
+	}
+
+	data := &Bitmessage{
+		FromAddressVersion: fromAddressVersion,
+		FromStreamNumber:   fromStreamNumber,
+		Behavior:           behavior,
+		SigningKey:         signingKey,
+		EncryptionKey:      encryptKey,
+		Pow: &pow.Data{
+			NonceTrialsPerByte: nonceTrials,
+			ExtraBytes:         extraBytes,
+		},
+		Encoding: encoding,
+		Message:  message,
+	}
+
+	return &Broadcast{
+			msg:       msg,
+			signature: signature,
+			data:      data,
+		}, &TstBroadcast{
+			i:         i,
+			Data:      data,
+			Signature: signature,
+			Private:   private,
+		}
+}
+
+func TstBroadcastEncryptParams(expires time.Time, streamNumber uint64,
+	tag *wire.ShaHash, fromAddressVersion, fromStreamNumber uint64,
+	behavior uint32, signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes,
+	encoding uint64, message []byte, private *identity.Private) (time.Time, *Bitmessage, *wire.ShaHash, *identity.Private) {
+
+	return expires, &Bitmessage{
+		FromAddressVersion: fromAddressVersion,
+		FromStreamNumber:   fromStreamNumber,
+		Behavior:           behavior,
+		SigningKey:         signingKey,
+		EncryptionKey:      encryptKey,
+		Pow: &pow.Data{
+			NonceTrialsPerByte: nonceTrials,
+			ExtraBytes:         extraBytes,
+		},
+		Encoding: encoding,
+		Message:  message,
+	}, tag, private
+}
+
+func TstGenerateBroadcastErrorData(validPubkey *wire.PubKey) (invSigningKey,
+	invEncKey, forwardingData, invalidSig, mismatchSig []byte) {
+
+	var b bytes.Buffer
+	attackB, _ := TstNewBroadcast(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+		1, Tag1, nil, 0, 0, 0, &wire.PubKey{}, validPubkey, 0, 0, 1, []byte{0x00}, nil, nil)
+	attackB.encodeForEncryption(&b)
+	invSigningKey, _ = btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+		b.Bytes())
+
+	b.Reset()
+	attackB, _ = TstNewBroadcast(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+		1, Tag1, nil, 0, 0, 0, validPubkey, &wire.PubKey{}, 0, 0, 1, []byte{0x00}, nil, nil)
+	attackB.encodeForEncryption(&b)
+	invEncKey, _ = btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+		b.Bytes())
+
+	b.Reset()
+	attackB, _ = TstNewBroadcast(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+		1, Tag1, nil, 4, 1, 0, validPubkey, validPubkey, 0, 0, 1, []byte{0x00}, nil, nil)
+	attackB.encodeForEncryption(&b)
+	forwardingData, _ = btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+		b.Bytes())
+
+	b.Reset()
+	sk, _ := wire.NewPubKey(PrivID1.SigningKey.PubKey().SerializeUncompressed()[1:])
+	ek, _ := wire.NewPubKey(PrivID1.EncryptionKey.PubKey().SerializeUncompressed()[1:])
+	attackB, _ = TstNewBroadcast(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+		1, Tag1, nil, 4, 1, 0, sk, ek, 0, 0, 1, []byte{0x00}, nil, nil)
+	attackB.encodeForEncryption(&b)
+	invalidSig, _ = btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+		b.Bytes())
+
+	b.Reset()
+	attackB.encodeForSigning(&b)
+	// should actually be hash
+	sig, _ := PrivID1.EncryptionKey.Sign(b.Bytes())
+	attackB.signature = sig.Serialize()
+	b.Reset()
+	attackB.encodeForEncryption(&b)
+	mismatchSig, _ = btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+		b.Bytes())
+
+	return
+}
+
+func TstNewMessage(nonce uint64, expires time.Time, streamNumber uint64,
+	encrypted []byte, addressVersion, fromStreamNumber uint64, behavior uint32,
+	signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes uint64,
+	destination *wire.RipeHash, encoding uint64,
+	message, ack, signature []byte) *Message {
+
+	msg := obj.NewMessage(nonce, expires, streamNumber, encrypted)
+
+	return &Message{
+		msg: msg,
+		data: &Bitmessage{
+			FromAddressVersion: addressVersion,
+			FromStreamNumber:   fromStreamNumber,
+			Behavior:           behavior,
+			SigningKey:         signingKey,
+			EncryptionKey:      encryptKey,
+			Pow: &pow.Data{
+				NonceTrialsPerByte: nonceTrials,
+				ExtraBytes:         extraBytes,
+			},
+			Destination: destination,
+			Encoding:    encoding,
+			Message:     message,
+		},
+		ack:       ack,
+		signature: signature,
+	}
+}
+
+func TstSignAndEncryptMessage(nonce uint64, expires time.Time, streamNumber uint64,
+	encrypted []byte, addressVersion, fromStreamNumber uint64, behavior uint32,
+	signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes uint64,
+	destination *wire.RipeHash, encoding uint64,
+	message, ack, signature []byte, privID *identity.Private, pubID *identity.Public) (*Message, error) {
+
+	if encrypted == nil && signature != nil {
+		panic("Test setup err A")
+	}
+
+	if encrypted != nil && nonce != 0 {
+		panic("Test setup err B")
+	}
+
+	if encrypted == nil && privID == nil {
+		panic("Test setup err C")
+	}
+
+	if encrypted != nil {
+		panic("Test setup err D")
+	}
+
+	data := &Bitmessage{
+		FromAddressVersion: addressVersion,
+		FromStreamNumber:   fromStreamNumber,
+		Behavior:           behavior,
+		SigningKey:         signingKey,
+		EncryptionKey:      encryptKey,
+		Pow: &pow.Data{
+			NonceTrialsPerByte: nonceTrials,
+			ExtraBytes:         extraBytes,
+		},
+		Destination: destination,
+		Encoding:    encoding,
+		Message:     message,
+	}
+
+	return SignAndEncryptMessage(expires, streamNumber, data, ack, privID, pubID)
+}
+
+func TstGenerateMessageErrorData(validPubkey *wire.PubKey) (invDest,
+	invSigningKey, invalidSig, mismatchSig []byte) {
+	var b bytes.Buffer
+	attackB := TstNewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+		1, nil, 0, 0, 0, &wire.PubKey{}, &wire.PubKey{}, 0, 0, &wire.RipeHash{}, 1, []byte{0x00}, []byte{}, nil)
+	attackB.encodeForEncryption(&b)
+	invDest, _ = btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
+
+	b.Reset()
+	attackB.data.SigningKey = &wire.PubKey{}
+	attackB.data.EncryptionKey = validPubkey
+	attackB.data.Destination, _ = wire.NewRipeHash(PrivID1.Address.Ripe[:])
+	attackB.encodeForEncryption(&b)
+	invSigningKey, _ = btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
+
+	b.Reset()
+	attackB.data.EncryptionKey, _ = wire.NewPubKey(PrivID2.EncryptionKey.PubKey().SerializeUncompressed()[1:])
+	attackB.data.SigningKey, _ = wire.NewPubKey(PrivID2.SigningKey.PubKey().SerializeUncompressed()[1:])
+	attackB.signature = []byte{0x00}
+	attackB.encodeForEncryption(&b)
+	invalidSig, _ = btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
+
+	b.Reset()
+	attackB.encodeForSigning(&b)
+	// should actually be hash
+	sig, _ := PrivID1.EncryptionKey.Sign(b.Bytes())
+	attackB.signature = sig.Serialize()
+	b.Reset()
+	attackB.encodeForEncryption(&b)
+	mismatchSig, _ = btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
+
+	return
 }

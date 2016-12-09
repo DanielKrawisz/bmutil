@@ -272,9 +272,7 @@ func (dp *decryptedPubKey) decryptAndVerify(address *bmutil.Address) error {
 	header := dp.object.Header()
 
 	// Check if embedded keys correspond to the address used for decryption.
-	id := identity.NewPublic(signKey, encKey,
-		dp.data.Pow.NonceTrialsPerByte, dp.data.Pow.ExtraBytes,
-		header.Version, header.StreamNumber)
+	id := identity.NewPublic(signKey, encKey, dp.data.Pow, header.Version, header.StreamNumber)
 
 	genAddr, _ := id.Address.Encode()
 	dencAddr, _ := address.Encode()

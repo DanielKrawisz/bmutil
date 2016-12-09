@@ -11,7 +11,11 @@ import (
 	"github.com/DanielKrawisz/bmutil/wire"
 )
 
-func (b *Broadcast) SetHeader(h *wire.ObjectHeader) {
+func (b *TaglessBroadcast) SetHeader(h *wire.ObjectHeader) {
+	b.header = h
+}
+
+func (b *TaggedBroadcast) SetHeader(h *wire.ObjectHeader) {
 	b.header = h
 }
 
@@ -35,21 +39,21 @@ func (p *EncryptedPubKey) SetHeader(h *wire.ObjectHeader) {
 	p.header = h
 }
 
-// TaggedBroadcast is a broadcast from a v4 address (includes a tag).
-func TaggedBroadcast() *Broadcast {
-	return &Broadcast{
+// TstTaggedBroadcast is a broadcast from a v4 address (includes a tag).
+func TstTaggedBroadcast() *TaggedBroadcast {
+	return &TaggedBroadcast{
 		header: &wire.ObjectHeader{
 			Nonce:        123123,                   // 0x1e0f3
 			ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
 			ObjectType:   wire.ObjectTypeBroadcast,
-			Version:      5,
+			Version:      TaggedBroadcastVersion,
 			StreamNumber: 1,
 		},
 		Tag: &wire.ShaHash{
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		},
-		Encrypted: []byte{
+		encrypted: []byte{
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -62,17 +66,17 @@ func TaggedBroadcast() *Broadcast {
 	}
 }
 
-// BaseBroadcast is used in the various tests as a baseline Broadcast.
-func BaseBroadcast() *Broadcast {
-	return &Broadcast{
+// TstTaglessBroadcast is used in the various tests as a baseline Broadcast.
+func TstTaglessBroadcast() *TaglessBroadcast {
+	return &TaglessBroadcast{
 		header: &wire.ObjectHeader{
 			Nonce:        123123,                   // 0x1e0f3
 			ExpiresTime:  time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
 			ObjectType:   wire.ObjectTypeBroadcast,
-			Version:      2,
+			Version:      TaglessBroadcastVersion,
 			StreamNumber: 1,
 		},
-		Encrypted: []byte{
+		encrypted: []byte{
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -85,8 +89,8 @@ func BaseBroadcast() *Broadcast {
 	}
 }
 
-// BaseGetPubKey is used in the various tests as a baseline GetPubKey.
-func BaseGetPubKey() *GetPubKey {
+// TstBaseGetPubKey is used in the various tests as a baseline GetPubKey.
+func TstBaseGetPubKey() *GetPubKey {
 	return &GetPubKey{
 		header: &wire.ObjectHeader{
 			Nonce:        123123,                   // 0x1e0f3
@@ -100,8 +104,8 @@ func BaseGetPubKey() *GetPubKey {
 	}
 }
 
-// TagGetPubKey is a pubkey request for a v4 pubkey which includes a tag.
-func TagGetPubKey() *GetPubKey {
+// TstTagGetPubKey is a pubkey request for a v4 pubkey which includes a tag.
+func TstTagGetPubKey() *GetPubKey {
 	return &GetPubKey{
 		header: &wire.ObjectHeader{
 			Nonce:        123123,                   // 0x1e0f3
@@ -117,8 +121,8 @@ func TagGetPubKey() *GetPubKey {
 	}
 }
 
-// InvalidVersion is a getpubkey message with unsupported version
-func InvalidGetPubKeyVersion() *GetPubKey {
+// TstInvalidVersion is a getpubkey message with unsupported version
+func TstInvalidGetPubKeyVersion() *GetPubKey {
 	return &GetPubKey{
 		header: &wire.ObjectHeader{
 			Nonce:        123123,                   // 0x1e0f3
@@ -132,8 +136,8 @@ func InvalidGetPubKeyVersion() *GetPubKey {
 	}
 }
 
-// BaseMessage is used in the various tests as a baseline MsgMsg.
-func BaseMessage() *Message {
+// TstBaseMessage is used in the various tests as a baseline MsgMsg.
+func TstBaseMessage() *Message {
 	return &Message{
 		header: &wire.ObjectHeader{
 			Nonce:        123123,                   // 0x1e0f3

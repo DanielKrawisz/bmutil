@@ -24,7 +24,7 @@ func TestMsg(t *testing.T) {
 	// Ensure the command is expected value.
 	now := time.Now()
 	enc := make([]byte, 99)
-	msg := obj.NewMessage(83928, now, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
+	msg := obj.NewMessage(83928, now, 1, enc)
 
 	// Ensure max payload is expected value for latest protocol version.
 	wantPayload := wire.MaxPayloadOfMsgObject
@@ -34,11 +34,6 @@ func TestMsg(t *testing.T) {
 			"- got %v, want %v", maxPayload, wantPayload)
 	}
 
-	str := msg.String()
-	if str[:3] != "msg" {
-		t.Errorf("String representation: got %v, want %v", str[:3], "msg")
-	}
-
 	return
 }
 
@@ -46,16 +41,8 @@ func TestMsg(t *testing.T) {
 func TestMessage(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	enc := make([]byte, 128)
-	msgBase := obj.NewMessage(83928, expires, 2, 1, enc, 0, 0, 0, nil, nil, 0, 0, nil, 0, nil, nil, nil)
-	ripeBytes := make([]byte, 20)
-	ripe, err := wire.NewRipeHash(ripeBytes)
-	if err != nil {
-		t.Fatalf("could not make a ripe hash %s", err)
-	}
-	m := make([]byte, 32)
-	a := make([]byte, 8)
-	s := make([]byte, 16)
-	msgFilled := obj.NewMessage(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
+	msgBase := obj.NewMessage(83928, expires, 1, enc)
+	msgFilled := obj.NewMessage(83928, expires, 1, enc)
 
 	tests := []struct {
 		in  *obj.Message // Message to encode
@@ -113,7 +100,7 @@ func TestMsgWireError(t *testing.T) {
 	copy(wrongObjectTypeEncoded, baseMsgEncoded)
 	wrongObjectTypeEncoded[19] = 0
 
-	baseMsg := obj.BaseMessage()
+	baseMsg := obj.TstBaseMessage()
 
 	tests := []struct {
 		in       *obj.Message // Value to encode
@@ -179,284 +166,12 @@ func TestMsgWireError(t *testing.T) {
 	}
 }
 
-// TestMsgMsgEncryption tests encoding and decoding for encryption.
-func TestMsgMsgEncryption(t *testing.T) {
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	enc := make([]byte, 128)
-	ripeBytes := make([]byte, 20)
-	ripe, err := wire.NewRipeHash(ripeBytes)
-	if err != nil {
-		t.Fatalf("could not make a ripe hash %s", err)
-	}
-	m := make([]byte, 32)
-	a := make([]byte, 8)
-	s := make([]byte, 16)
-	msgFilled := obj.NewMessage(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
-
-	tests := []struct {
-		in  *obj.Message // Message to encode
-		out *obj.Message // Expected decoded message
-		buf []byte       // Wire encoding
-	}{
-		{
-			msgFilled,
-			msgFilled,
-			filledMsgEncodedForEncryption,
-		},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// Encode the message to wire.format.
-		var buf bytes.Buffer
-		err := test.in.EncodeForEncryption(&buf)
-		if err != nil {
-			t.Errorf("Encode #%d error %v", i, err)
-			continue
-		}
-		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("EncodeForEncryption #%d\n got: %s want: %s", i,
-				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
-			continue
-		}
-
-		// Decode the message from wire.format.
-		var msg obj.Message
-
-		rbuf := bytes.NewReader(test.buf)
-		err = msg.DecodeFromDecrypted(rbuf)
-		if err != nil {
-			t.Errorf("DecodeFromDecrypted #%d error %v", i, err)
-			continue
-		}
-
-		// Copy the fields that are not written by DecodeFromDecrypted
-		msg.SetHeader(test.in.Header())
-		msg.Encrypted = test.in.Encrypted
-
-		if !reflect.DeepEqual(&msg, test.out) {
-			t.Errorf("DecodeFromDecrypted #%d\n got: %s want: %s", i,
-				spew.Sdump(msg), spew.Sdump(test.out))
-			continue
-		}
-	}
-}
-
-// TestMsgEncryptError tests the MsgMsg encrypt error paths
-func TestMsgEncryptError(t *testing.T) {
-
-	wrongObjectTypeEncoded := make([]byte, len(baseMsgEncoded))
-	copy(wrongObjectTypeEncoded, baseMsgEncoded)
-	wrongObjectTypeEncoded[19] = 0
-
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	ripeBytes := make([]byte, 20)
-	enc := make([]byte, 128)
-	ripe, _ := wire.NewRipeHash(ripeBytes)
-	m := make([]byte, 32)
-	a := make([]byte, 8)
-	s := make([]byte, 16)
-	msgFilled := obj.NewMessage(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
-
-	tests := []struct {
-		in  *obj.Message // Value to encode
-		buf []byte       // Wire encoding
-		max int          // Max size of fixed buffer to induce errors
-	}{
-		// Force error in FromAddressVersion
-		{msgFilled, filledMsgEncodedForEncryption, 0},
-		// Force error FromStreamNumber.
-		{msgFilled, filledMsgEncodedForEncryption, 1},
-		// Force error Behavior.
-		{msgFilled, filledMsgEncodedForEncryption, 8},
-		// Force error in NonceTrials
-		{msgFilled, filledMsgEncodedForEncryption, 134},
-		// Force error in ExtraBytes
-		{msgFilled, filledMsgEncodedForEncryption, 137},
-		// Force error in Destination
-		{msgFilled, filledMsgEncodedForEncryption, 152},
-		// Force error in encoding.
-		{msgFilled, filledMsgEncodedForEncryption, 160},
-		// Force error in message length.
-		{msgFilled, filledMsgEncodedForEncryption, 161},
-		// Force error in message.
-		{msgFilled, filledMsgEncodedForEncryption, 168},
-		// Force error in acklength
-		{msgFilled, filledMsgEncodedForEncryption, 194},
-		// Force error in ack.
-		{msgFilled, filledMsgEncodedForEncryption, 195},
-		// Force error in siglength
-		{msgFilled, filledMsgEncodedForEncryption, 203},
-		// Force error in sig.
-		{msgFilled, filledMsgEncodedForEncryption, 204},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// EncodeForEncryption.
-		w := fixed.NewWriter(test.max)
-		err := test.in.EncodeForEncryption(w)
-		if err == nil {
-			t.Errorf("EncodeForEncryption #%d no error returned", i)
-			continue
-		}
-
-		// DecodeFromDecrypted.
-		var msg obj.Message
-		buf := bytes.NewBuffer(test.buf[0:test.max])
-		err = msg.DecodeFromDecrypted(buf)
-		if err == nil {
-			t.Errorf("DecodeFromDecrypted #%d no error returned", i)
-			continue
-		}
-	}
-
-	// Try to decode too long a message.
-	var msg obj.Message
-	filledMsgEncodedForEncryption[161] = 0xff
-	filledMsgEncodedForEncryption[162] = 200
-	filledMsgEncodedForEncryption[163] = 200
-	buf := bytes.NewBuffer(filledMsgEncodedForEncryption)
-	err := msg.DecodeFromDecrypted(buf)
-	if err == nil {
-		t.Error("EncodeForEncryption should have returned an error for too long a message length.")
-	}
-	filledMsgEncodedForEncryption[161] = 32
-	filledMsgEncodedForEncryption[162] = 0
-	filledMsgEncodedForEncryption[163] = 0
-
-	// Try to decode too long an ack.
-	filledMsgEncodedForEncryption[194] = 0xff
-	filledMsgEncodedForEncryption[195] = 200
-	filledMsgEncodedForEncryption[196] = 200
-	buf = bytes.NewBuffer(filledMsgEncodedForEncryption)
-	err = msg.DecodeFromDecrypted(buf)
-	if err == nil {
-		t.Error("EncodeForEncryption should have returned an error for too long an ack length.")
-	}
-	filledMsgEncodedForEncryption[194] = 8
-	filledMsgEncodedForEncryption[195] = 0
-	filledMsgEncodedForEncryption[196] = 0
-
-	// Try to decode a message with too long of a signature.
-	filledMsgEncodedForEncryption[203] = 0xff
-	filledMsgEncodedForEncryption[204] = 200
-	filledMsgEncodedForEncryption[205] = 200
-	buf = bytes.NewBuffer(filledMsgEncodedForEncryption)
-	err = msg.DecodeFromDecrypted(buf)
-	if err == nil {
-		t.Error("EncodeForEncryption should have returned an error for too long a signature length.")
-	}
-	filledMsgEncodedForEncryption[203] = 16
-	filledMsgEncodedForEncryption[204] = 0
-	filledMsgEncodedForEncryption[205] = 0
-}
-
-// TestMsgMsgSigning tests encoding for signing.
-func TestMsgMsgEncodeForSigning(t *testing.T) {
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	enc := make([]byte, 128)
-	ripeBytes := make([]byte, 20)
-	ripe, err := wire.NewRipeHash(ripeBytes)
-	if err != nil {
-		t.Fatalf("could not make a ripe hash %s", err)
-	}
-	m := make([]byte, 32)
-	a := make([]byte, 8)
-	s := make([]byte, 16)
-	msgFilled := obj.NewMessage(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
-
-	tests := []struct {
-		in  *obj.Message // Message to encode
-		buf []byte       // Wire encoding
-	}{
-		{
-			msgFilled,
-			filledMsgEncodedForSigning,
-		},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// Encode the message to wire.format.
-		var buf bytes.Buffer
-		err := test.in.EncodeForSigning(&buf)
-		if err != nil {
-			t.Errorf("Encode #%d error %v", i, err)
-			continue
-		}
-		if !bytes.Equal(buf.Bytes(), test.buf) {
-			t.Errorf("EncodeForSigning #%d\n got: %s want: %s", i,
-				spew.Sdump(buf.Bytes()), spew.Sdump(test.buf))
-			continue
-		}
-	}
-}
-
-// TestMsgEncryptError tests the MsgMsg encrypt error paths
-func TestMsgEncodeForSigningError(t *testing.T) {
-
-	wrongObjectTypeEncoded := make([]byte, len(baseMsgEncoded))
-	copy(wrongObjectTypeEncoded, baseMsgEncoded)
-	wrongObjectTypeEncoded[19] = 0
-
-	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	ripeBytes := make([]byte, 20)
-	enc := make([]byte, 128)
-	ripe, _ := wire.NewRipeHash(ripeBytes)
-	m := make([]byte, 32)
-	a := make([]byte, 8)
-	s := make([]byte, 16)
-	msgFilled := obj.NewMessage(83928, expires, 2, 1, enc, 5, 1, 1, pubKey1, pubKey2, 512, 512, ripe, 0, m, a, s)
-
-	tests := []struct {
-		in  *obj.Message // Value to encode
-		max int          // Max size of fixed buffer to induce errors
-	}{
-		// Force error in the header.
-		{msgFilled, -10},
-		// Force error in FromAddressVersion
-		{msgFilled, 0},
-		// Force error FromStreamNumber.
-		{msgFilled, 1},
-		// Force error Behavior.
-		{msgFilled, 8},
-		// Force error in NonceTrials
-		{msgFilled, 134},
-		// Force error in ExtraBytes
-		{msgFilled, 137},
-		// Force error in Destination
-		{msgFilled, 152},
-		// Force error in encoding.
-		{msgFilled, 160},
-		// Force error in message length.
-		{msgFilled, 161},
-		// Force error in message.
-		{msgFilled, 168},
-		// Force error in acklength
-		{msgFilled, 194},
-		// Force error in ack.
-		{msgFilled, 195},
-	}
-
-	t.Logf("Running %d tests", len(tests))
-	for i, test := range tests {
-		// EncodeForEncryption.
-		w := fixed.NewWriter(test.max + 14)
-		err := test.in.EncodeForSigning(w)
-		if err == nil {
-			t.Errorf("EncodeForEncryption #%d no error returned", i)
-			continue
-		}
-	}
-}
-
 // baseMsgEncoded is the wire.encoded bytes for baseMsg (just encrypted data)
 var baseMsgEncoded = []byte{
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce
 	0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29, // 64-bit Timestamp
 	0x00, 0x00, 0x00, 0x02, // Object Type
-	0x02, // Version
+	0x01, // Version
 	0x01, // Stream Number
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

@@ -12,35 +12,26 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
 
-// Message implements the Message interface and represents a message sent between
-// two addresses. It can be decrypted only by those that have the private
-// encryption key that corresponds to the destination address.
+// MessageVersion is the standard version number for message objects.
+const MessageVersion = 1
+
+// Message implements the Object and Message interfaces and represents a
+// message sent between two addresses. It can be decrypted only by those
+// that have the private encryption key that corresponds to the
+// destination address.
 type Message struct {
-	header             *wire.ObjectHeader
-	Encrypted          []byte
-	FromAddressVersion uint64
-	FromStreamNumber   uint64
-	Behavior           uint32
-	SigningKey         *wire.PubKey
-	EncryptionKey      *wire.PubKey
-	NonceTrials        uint64
-	ExtraBytes         uint64
-	Destination        *wire.RipeHash
-	Encoding           uint64
-	Message            []byte
-	Ack                []byte
-	Signature          []byte
+	header    *wire.ObjectHeader
+	Encrypted []byte
 }
 
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *Message) Decode(r io.Reader) error {
 	var err error
-	msg.header, err = wire.DecodeMsgObjectHeader(r)
+	msg.header, err = wire.DecodeObjectHeader(r)
 	if err != nil {
 		return err
 	}
@@ -83,177 +74,10 @@ func (msg *Message) String() string {
 		msg.Encrypted)
 }
 
-// EncodeForSigning encodes Message so that it can be hashed and signed.
-func (msg *Message) EncodeForSigning(w io.Writer) error {
-	err := msg.header.EncodeForSigning(w)
-	if err != nil {
-		return err
-	}
-	if err = bmutil.WriteVarInt(w, msg.FromAddressVersion); err != nil {
-		return err
-	}
-	if err = bmutil.WriteVarInt(w, msg.FromStreamNumber); err != nil {
-		return err
-	}
-	err = wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
-	if err != nil {
-		return err
-	}
-	if msg.FromAddressVersion >= 3 {
-		if err = bmutil.WriteVarInt(w, msg.NonceTrials); err != nil {
-			return err
-		}
-		if err = bmutil.WriteVarInt(w, msg.ExtraBytes); err != nil {
-			return err
-		}
-	}
-	err = wire.WriteElement(w, msg.Destination)
-	if err != nil {
-		return err
-	}
-	if err = bmutil.WriteVarInt(w, msg.Encoding); err != nil {
-		return err
-	}
-	msgLength := uint64(len(msg.Message))
-	if err = bmutil.WriteVarInt(w, msgLength); err != nil {
-		return err
-	}
-	if _, err := w.Write(msg.Message); err != nil {
-		return err
-	}
-	ackLength := uint64(len(msg.Ack))
-	if err = bmutil.WriteVarInt(w, ackLength); err != nil {
-		return err
-	}
-	if _, err := w.Write(msg.Ack); err != nil {
-		return err
-	}
-	return nil
-}
-
-// EncodeForEncryption encodes Message so that it can be encrypted.
-func (msg *Message) EncodeForEncryption(w io.Writer) error {
-	if err := bmutil.WriteVarInt(w, msg.FromAddressVersion); err != nil {
-		return err
-	}
-	if err := bmutil.WriteVarInt(w, msg.FromStreamNumber); err != nil {
-		return err
-	}
-	err := wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
-	if err != nil {
-		return err
-	}
-	if msg.FromAddressVersion >= 3 {
-		if err = bmutil.WriteVarInt(w, msg.NonceTrials); err != nil {
-			return err
-		}
-		if err = bmutil.WriteVarInt(w, msg.ExtraBytes); err != nil {
-			return err
-		}
-	}
-	if err = wire.WriteElement(w, msg.Destination); err != nil {
-		return err
-	}
-	if err = bmutil.WriteVarInt(w, msg.Encoding); err != nil {
-		return err
-	}
-	msgLength := uint64(len(msg.Message))
-	if err = bmutil.WriteVarInt(w, msgLength); err != nil {
-		return err
-	}
-	if _, err := w.Write(msg.Message); err != nil {
-		return err
-	}
-	ackLength := uint64(len(msg.Ack))
-	if err = bmutil.WriteVarInt(w, ackLength); err != nil {
-		return err
-	}
-	if _, err := w.Write(msg.Ack); err != nil {
-		return err
-	}
-	sigLength := uint64(len(msg.Signature))
-	if err = bmutil.WriteVarInt(w, sigLength); err != nil {
-		return err
-	}
-	if _, err = w.Write(msg.Signature); err != nil {
-		return err
-	}
-	return nil
-}
-
-// DecodeFromDecrypted decodes Message from its decrypted form.
-func (msg *Message) DecodeFromDecrypted(r io.Reader) error {
-	var err error
-	if msg.FromAddressVersion, err = bmutil.ReadVarInt(r); err != nil {
-		return err
-	}
-	if msg.FromStreamNumber, err = bmutil.ReadVarInt(r); err != nil {
-		return err
-	}
-	msg.SigningKey = &wire.PubKey{}
-	msg.EncryptionKey = &wire.PubKey{}
-	err = wire.ReadElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
-	if err != nil {
-		return err
-	}
-	if msg.FromAddressVersion >= 3 {
-		if msg.NonceTrials, err = bmutil.ReadVarInt(r); err != nil {
-			return err
-		}
-		if msg.ExtraBytes, err = bmutil.ReadVarInt(r); err != nil {
-			return err
-		}
-	}
-	msg.Destination = &wire.RipeHash{}
-	if err = wire.ReadElement(r, msg.Destination); err != nil {
-		return err
-	}
-	if msg.Encoding, err = bmutil.ReadVarInt(r); err != nil {
-		return err
-	}
-	var msgLength uint64
-	if msgLength, err = bmutil.ReadVarInt(r); err != nil {
-		return err
-	}
-	if msgLength > wire.MaxPayloadOfMsgObject {
-		str := fmt.Sprintf("message length exceeds max length - "+
-			"indicates %d, but max length is %d",
-			msgLength, wire.MaxPayloadOfMsgObject)
-		return wire.NewMessageError("DecodeFromDecrypted", str)
-	}
-	msg.Message = make([]byte, msgLength)
-	_, err = io.ReadFull(r, msg.Message)
-	if err != nil {
-		return err
-	}
-	var ackLength uint64
-	if ackLength, err = bmutil.ReadVarInt(r); err != nil {
-		return err
-	}
-	if ackLength > wire.MaxPayloadOfMsgObject {
-		str := fmt.Sprintf("ack length exceeds max length - "+
-			"indicates %d, but max length is %d",
-			msgLength, wire.MaxPayloadOfMsgObject)
-		return wire.NewMessageError("DecodeFromDecrypted", str)
-	}
-	msg.Ack = make([]byte, ackLength)
-	_, err = io.ReadFull(r, msg.Ack)
-	if err != nil {
-		return err
-	}
-	var sigLength uint64
-	if sigLength, err = bmutil.ReadVarInt(r); err != nil {
-		return err
-	}
-	if sigLength > signatureMaxLength {
-		str := fmt.Sprintf("signature length exceeds max length - "+
-			"indicates %d, but max length is %d",
-			sigLength, signatureMaxLength)
-		return wire.NewMessageError("DecodeFromDecrypted", str)
-	}
-	msg.Signature = make([]byte, sigLength)
-	_, err = io.ReadFull(r, msg.Signature)
-	return err
+// Command returns the protocol command string for the message. This is part
+// of the Message interface implementation.
+func (msg *Message) Command() string {
+	return wire.CmdObject
 }
 
 // Header returns the object header.
@@ -278,35 +102,20 @@ func (msg *Message) InventoryHash() *wire.ShaHash {
 
 // NewMessage returns a new object message that conforms to the Message interface
 // using the passed parameters and defaults for the remaining fields.
-func NewMessage(nonce uint64, expires time.Time, version, streamNumber uint64,
-	encrypted []byte, addressVersion, fromStreamNumber uint64, behavior uint32,
-	signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes uint64,
-	destination *wire.RipeHash, encoding uint64, message, ack, signature []byte) *Message {
+func NewMessage(nonce uint64, expires time.Time, streamNumber uint64, encrypted []byte) *Message {
 	return &Message{
 		header: &wire.ObjectHeader{
 			Nonce:        nonce,
 			ExpiresTime:  expires,
 			ObjectType:   wire.ObjectTypeMsg,
-			Version:      version,
+			Version:      MessageVersion,
 			StreamNumber: streamNumber,
 		},
-		Encrypted:          encrypted,
-		FromAddressVersion: addressVersion,
-		FromStreamNumber:   fromStreamNumber,
-		Behavior:           behavior,
-		SigningKey:         signingKey,
-		EncryptionKey:      encryptKey,
-		NonceTrials:        nonceTrials,
-		ExtraBytes:         extraBytes,
-		Destination:        destination,
-		Encoding:           encoding,
-		Message:            message,
-		Ack:                ack,
-		Signature:          signature,
+		Encrypted: encrypted,
 	}
 }
 
-// DecodeMessage takes a byte array and turns it into an object message.
+// DecodeMessage takes a byte array and turns it into a message object.
 func DecodeMessage(obj []byte) (*Message, error) {
 	// Make sure that object type specific checks happen first.
 	var msg *Message

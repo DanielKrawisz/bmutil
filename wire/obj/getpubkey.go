@@ -34,7 +34,7 @@ type GetPubKey struct {
 // This is part of the Message interface implementation.
 func (msg *GetPubKey) Decode(r io.Reader) error {
 	var err error
-	msg.header, err = wire.DecodeMsgObjectHeader(r)
+	msg.header, err = wire.DecodeObjectHeader(r)
 	if err != nil {
 		return err
 	}

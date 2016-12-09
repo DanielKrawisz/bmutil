@@ -51,11 +51,21 @@ func ReadObject(o *wire.MsgObject) Object {
 	case wire.ObjectTypeMsg:
 		obj = &Message{}
 	case wire.ObjectTypeBroadcast:
-		obj = &Broadcast{}
+		switch o.Header().Version {
+		case TaggedBroadcastVersion:
+			obj = &TaggedBroadcast{}
+		case TaglessBroadcastVersion:
+			obj = &TaglessBroadcast{}
+		default:
+			return o
+		}
 	default:
 		return o
 	}
 
-	obj.Decode(encoded)
+	err := obj.Decode(encoded)
+	if err != nil {
+		return o
+	}
 	return obj
 }
