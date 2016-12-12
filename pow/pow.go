@@ -31,7 +31,7 @@ func CalculateTarget(payloadLength, ttl uint64, data Data) uint64 {
 // obj is a byte slice containing the object message.
 func Check(msg *wire.MsgObject, data Data, refTime time.Time) bool {
 	// calculate ttl from bytes 8-16 that contain ExpiresTime
-	ttl := uint64(msg.Header().ExpiresTime.Unix() - refTime.Unix())
+	ttl := uint64(msg.Header().Expiration().Unix() - refTime.Unix())
 
 	obj := wire.EncodeMessage(msg)
 	msgHash := bmutil.Sha512(obj[8:]) // exclude nonce value in the beginning

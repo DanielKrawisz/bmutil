@@ -50,44 +50,13 @@ func TestObjectTypeString(t *testing.T) {
 	}
 }
 
-func TestString(t *testing.T) {
-	obj, _ := wire.DecodeMsgObject([]byte{
-		0, 0, 0, 0, 0, 0, 0, 123, 0, 0, 0, 0, 85, 75, 111, 20,
-		0, 0, 0, 0, 4, 1, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107,
-		108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122, 123,
-		124, 125, 126, 127, 128, 129})
-
-	str := obj.String()
-	if str[8:17] != "Getpubkey" {
-		t.Errorf("String representation: got %v, want %v", str[8:17], "Getpubkey")
-	}
-}
-
 // TestEncodeAndDecodeObjectHeader tests EncodeObjectHeader and DecodeObjectHeader
 // It is not necessary to test separate cases for different object types.
 func TestEncodeAndDecodeObjectHeader(t *testing.T) {
-	tests := []wire.ObjectHeader{
-		wire.ObjectHeader{
-			Nonce:        uint64(123),
-			ExpiresTime:  time.Now(),
-			ObjectType:   wire.ObjectType(0),
-			Version:      0,
-			StreamNumber: 1,
-		},
-		wire.ObjectHeader{
-			Nonce:        uint64(8390),
-			ExpiresTime:  time.Now().Add(-37 * time.Hour),
-			ObjectType:   wire.ObjectType(66),
-			Version:      33,
-			StreamNumber: 17,
-		},
-		wire.ObjectHeader{
-			Nonce:        uint64(65),
-			ExpiresTime:  time.Now().Add(5 * time.Second),
-			ObjectType:   wire.ObjectType(2),
-			Version:      2,
-			StreamNumber: 8,
-		},
+	tests := []*wire.ObjectHeader{
+		wire.NewObjectHeader(123, time.Now(), wire.ObjectType(0), 0, 1),
+		wire.NewObjectHeader(8390, time.Now().Add(-37*time.Hour), wire.ObjectType(66), 33, 17),
+		wire.NewObjectHeader(65, time.Now().Add(5*time.Second), wire.ObjectType(2), 2, 8),
 	}
 
 	for i, test := range tests {
@@ -103,8 +72,9 @@ func TestEncodeAndDecodeObjectHeader(t *testing.T) {
 		if header.Nonce != test.Nonce {
 			t.Errorf("Error on test case %d: nonce should be %x, got %x", i, test.Nonce, header.Nonce)
 		}
-		if header.ExpiresTime.Unix() != test.ExpiresTime.Unix() {
-			t.Errorf("Error on test case %d: expire time should be %x, got %x", i, test.ExpiresTime.Unix(), header.ExpiresTime.Unix())
+		if header.Expiration().Unix() != test.Expiration().Unix() {
+			t.Errorf("Error on test case %d: expire time should be %x, got %x",
+				i, test.Expiration().Unix(), header.Expiration().Unix())
 		}
 		if header.ObjectType != test.ObjectType {
 			t.Errorf("Error on test case %d: object type should be %d, got %d", i, test.ObjectType, header.ObjectType)
@@ -167,7 +137,7 @@ func TestDecodeMsgObject(t *testing.T) {
 			false,
 		},
 		{ // Valid case: unknown object.
-			wire.EncodeMessage(wire.NewMsgObject(&wire.ObjectHeader{345, expires, wire.ObjectType(4), 1, 1}, []byte{77, 82, 53, 48, 96, 1})),
+			wire.EncodeMessage(wire.NewMsgObject(wire.NewObjectHeader(345, expires, wire.ObjectType(4), 1, 1), []byte{77, 82, 53, 48, 96, 1})),
 			false,
 		},
 	}
@@ -214,7 +184,7 @@ func TestCopy(t *testing.T) {
 	broadcast := obj.NewTaggedBroadcast(876, expires, 1, &shahash,
 		[]byte{90, 87, 66, 45, 3, 2, 120, 101, 78, 78, 78, 7, 85, 55, 2, 23}).MsgObject()
 
-	unknown := wire.NewMsgObject(&wire.ObjectHeader{345, expires, wire.ObjectType(4), 1, 1}, []byte{77, 82, 53, 48, 96, 1})
+	unknown := wire.NewMsgObject(wire.NewObjectHeader(345, expires, wire.ObjectType(4), 1, 1), []byte{77, 82, 53, 48, 96, 1})
 
 	tests := []struct {
 		obj *wire.MsgObject
@@ -254,7 +224,7 @@ func TestCopy(t *testing.T) {
 }
 
 func TestNew(t *testing.T) {
-	obj := wire.NewMsgObject(&wire.ObjectHeader{123, time.Now(), 3, 1, 1}, []byte{1, 2, 3, 4, 5, 56})
+	obj := wire.NewMsgObject(wire.NewObjectHeader(123, time.Now(), 3, 1, 1), []byte{1, 2, 3, 4, 5, 56})
 
 	if obj == nil {
 		t.Error("Failed to return object.")

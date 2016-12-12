@@ -7,6 +7,7 @@ package obj
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -66,12 +67,9 @@ func (msg *Message) MaxPayloadLength() int {
 }
 
 func (msg *Message) String() string {
-	return fmt.Sprintf("msg: v%d %d %s %d %x",
-		msg.header.Version,
-		msg.header.Nonce,
-		msg.header.ExpiresTime,
-		msg.header.StreamNumber,
-		msg.Encrypted)
+	return fmt.Sprintf("Message{%s, %s}",
+		msg.header.String(),
+		hex.EncodeToString(msg.Encrypted))
 }
 
 // Command returns the protocol command string for the message. This is part
@@ -102,15 +100,15 @@ func (msg *Message) InventoryHash() *wire.ShaHash {
 
 // NewMessage returns a new object message that conforms to the Message interface
 // using the passed parameters and defaults for the remaining fields.
-func NewMessage(nonce uint64, expires time.Time, streamNumber uint64, encrypted []byte) *Message {
+func NewMessage(nonce uint64, expiration time.Time, streamNumber uint64, encrypted []byte) *Message {
 	return &Message{
-		header: &wire.ObjectHeader{
-			Nonce:        nonce,
-			ExpiresTime:  expires,
-			ObjectType:   wire.ObjectTypeMsg,
-			Version:      MessageVersion,
-			StreamNumber: streamNumber,
-		},
+		header: wire.NewObjectHeader(
+			nonce,
+			expiration,
+			wire.ObjectTypeMsg,
+			MessageVersion,
+			streamNumber,
+		),
 		Encrypted: encrypted,
 	}
 }

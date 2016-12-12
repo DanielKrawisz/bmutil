@@ -7,6 +7,8 @@ package wire
 
 import (
 	"bytes"
+	"encoding/hex"
+	"fmt"
 	"io"
 	"io/ioutil"
 
@@ -84,7 +86,7 @@ func (msg *MsgObject) MaxPayloadLength() int {
 }
 
 func (msg *MsgObject) String() string {
-	return msg.header.String()
+	return fmt.Sprintf("Object{%s, Payload: %s}", msg.header, hex.EncodeToString(msg.payload))
 }
 
 // Header returns the object header.

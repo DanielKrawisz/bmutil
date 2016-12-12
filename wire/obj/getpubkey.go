@@ -7,6 +7,7 @@ package obj
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"time"
@@ -98,9 +99,13 @@ func (msg *GetPubKey) MaxPayloadLength() int {
 }
 
 func (msg *GetPubKey) String() string {
-	return fmt.Sprintf("getpubkey: v%d %d %s %d %x %x",
-		msg.header.Version, msg.header.Nonce, msg.header.ExpiresTime,
-		msg.header.StreamNumber, msg.Ripe, msg.Tag)
+	var hash string
+	if msg.Ripe == nil {
+		hash = hex.EncodeToString(msg.Tag.Bytes())
+	} else {
+		hash = hex.EncodeToString(msg.Ripe.Bytes())
+	}
+	return fmt.Sprintf("GetPubKey{%s, %s}", msg.header.String(), hash)
 }
 
 // Header returns the object header.
@@ -128,19 +133,18 @@ func (msg *GetPubKey) InventoryHash() *wire.ShaHash {
 // NewGetPubKey returns a new object message that conforms to the
 // Message interface using the passed parameters and defaults for the remaining
 // fields.
-func NewGetPubKey(nonce uint64, expires time.Time, version, streamNumber uint64,
+func NewGetPubKey(nonce uint64, expiration time.Time, version, streamNumber uint64,
 	ripe *wire.RipeHash, tag *wire.ShaHash) *GetPubKey {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
 	return &GetPubKey{
-		header: &wire.ObjectHeader{
-			Nonce:        nonce,
-			ExpiresTime:  expires,
-			ObjectType:   wire.ObjectTypeGetPubKey,
-			Version:      version,
-			StreamNumber: streamNumber,
-		},
+		header: wire.NewObjectHeader(
+			nonce,
+			expiration,
+			wire.ObjectTypeGetPubKey,
+			version,
+			streamNumber),
 		Ripe: ripe,
 		Tag:  tag,
 	}

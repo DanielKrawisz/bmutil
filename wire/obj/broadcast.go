@@ -7,6 +7,7 @@ package obj
 
 import (
 	"bytes"
+	"encoding/hex"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -107,9 +108,8 @@ func (msg *TaglessBroadcast) MaxPayloadLength() int {
 // String creates a human-readable string that with information
 // about the broadcast.
 func (msg *TaglessBroadcast) String() string {
-	return fmt.Sprintf("broadcast: v%d %d %s %d %x",
-		msg.header.Version, msg.header.Nonce, msg.header.ExpiresTime,
-		msg.header.StreamNumber, msg.encrypted)
+	return fmt.Sprintf("Broadcast{%s, %s}",
+		msg.header.String(), hex.EncodeToString(msg.encrypted))
 }
 
 // Header returns the object header.
@@ -237,9 +237,10 @@ func (msg *TaggedBroadcast) MaxPayloadLength() int {
 }
 
 func (msg *TaggedBroadcast) String() string {
-	return fmt.Sprintf("broadcast: v%d %d %s %d %x %x",
-		msg.header.Version, msg.header.Nonce, msg.header.ExpiresTime,
-		msg.header.StreamNumber, msg.Tag, msg.encrypted)
+	return fmt.Sprintf("Broadcast{%s, Tag:%s, %s}",
+		msg.header.String(),
+		hex.EncodeToString(msg.Tag.Bytes()),
+		hex.EncodeToString(msg.encrypted))
 }
 
 // Header returns the object header.
@@ -278,16 +279,16 @@ func (msg *TaggedBroadcast) Encrypted() []byte {
 // NewTaglessBroadcast returns a new object message that conforms to the
 // Object interface using the passed parameters and defaults for the remaining
 // fields.
-func NewTaglessBroadcast(nonce uint64, expires time.Time, streamNumber uint64,
+func NewTaglessBroadcast(nonce uint64, expiration time.Time, streamNumber uint64,
 	encrypted []byte) *TaglessBroadcast {
 	return &TaglessBroadcast{
-		header: &wire.ObjectHeader{
-			Nonce:        nonce,
-			ExpiresTime:  expires,
-			ObjectType:   wire.ObjectTypeBroadcast,
-			Version:      TaglessBroadcastVersion,
-			StreamNumber: streamNumber,
-		},
+		header: wire.NewObjectHeader(
+			nonce,
+			expiration,
+			wire.ObjectTypeBroadcast,
+			TaglessBroadcastVersion,
+			streamNumber,
+		),
 		encrypted: encrypted,
 	}
 }
@@ -295,16 +296,16 @@ func NewTaglessBroadcast(nonce uint64, expires time.Time, streamNumber uint64,
 // NewTaggedBroadcast returns a new object message that conforms to the
 // Object interface using the passed parameters and defaults for the remaining
 // fields.
-func NewTaggedBroadcast(nonce uint64, expires time.Time, streamNumber uint64,
+func NewTaggedBroadcast(nonce uint64, expiration time.Time, streamNumber uint64,
 	tag *wire.ShaHash, encrypted []byte) *TaggedBroadcast {
 	return &TaggedBroadcast{
-		header: &wire.ObjectHeader{
-			Nonce:        nonce,
-			ExpiresTime:  expires,
-			ObjectType:   wire.ObjectTypeBroadcast,
-			Version:      TaggedBroadcastVersion,
-			StreamNumber: streamNumber,
-		},
+		header: wire.NewObjectHeader(
+			nonce,
+			expiration,
+			wire.ObjectTypeBroadcast,
+			TaggedBroadcastVersion,
+			streamNumber,
+		),
 		Tag:       tag,
 		encrypted: encrypted,
 	}

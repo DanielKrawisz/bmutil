@@ -27,18 +27,16 @@ type incompleteBroadcast interface {
 }
 
 type incompleteTaglessBroadcast struct {
-	expires      time.Time
+	expiration   time.Time
 	streamNumber uint64
 }
 
 func (i *incompleteTaglessBroadcast) Encode(w io.Writer) error {
-	err := (&wire.ObjectHeader{
-		Nonce:        0,
-		ExpiresTime:  i.expires,
-		ObjectType:   wire.ObjectTypeBroadcast,
-		Version:      obj.TaglessBroadcastVersion,
-		StreamNumber: i.streamNumber,
-	}).EncodeForSigning(w)
+	err := wire.NewObjectHeader(
+		0, i.expiration,
+		wire.ObjectTypeBroadcast,
+		obj.TaglessBroadcastVersion,
+		i.streamNumber).EncodeForSigning(w)
 	if err != nil {
 		return err
 	}
@@ -53,23 +51,21 @@ func (i *incompleteTaglessBroadcast) Encrypt(address *bmutil.Address, data []byt
 		return nil, err
 	}
 
-	return obj.NewTaglessBroadcast(0, i.expires, i.streamNumber, encrypted), nil
+	return obj.NewTaglessBroadcast(0, i.expiration, i.streamNumber, encrypted), nil
 }
 
 type incompleteTaggedBroadcast struct {
-	expires      time.Time
+	expiration   time.Time
 	streamNumber uint64
 	tag          *wire.ShaHash
 }
 
 func (i *incompleteTaggedBroadcast) Encode(w io.Writer) error {
-	err := (&wire.ObjectHeader{
-		Nonce:        0,
-		ExpiresTime:  i.expires,
-		ObjectType:   wire.ObjectTypeBroadcast,
-		Version:      obj.TaggedBroadcastVersion,
-		StreamNumber: i.streamNumber,
-	}).EncodeForSigning(w)
+	err := wire.NewObjectHeader(
+		0, i.expiration,
+		wire.ObjectTypeBroadcast,
+		obj.TaggedBroadcastVersion,
+		i.streamNumber).EncodeForSigning(w)
 	if err != nil {
 		return err
 	}
@@ -89,7 +85,7 @@ func (i *incompleteTaggedBroadcast) Encrypt(address *bmutil.Address, data []byte
 		return nil, err
 	}
 
-	return obj.NewTaggedBroadcast(0, i.expires, i.streamNumber, i.tag, encrypted), nil
+	return obj.NewTaggedBroadcast(0, i.expiration, i.streamNumber, i.tag, encrypted), nil
 }
 
 // broadcastEncodeForSigning encodes Broadcast so that it can be hashed and signed.

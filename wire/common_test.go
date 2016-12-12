@@ -14,7 +14,6 @@ import (
 	"io"
 	"reflect"
 	"testing"
-	"time"
 
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/fixed"
@@ -127,10 +126,6 @@ func TestElementWire(t *testing.T) {
 		{
 			wire.ObjectTypePubKey,
 			[]byte{0x00, 0x00, 0x0, 0x01},
-		},
-		{
-			time.Unix(0x495fab29, 0), // 2009-01-03 12:15:05 -0600 CST)
-			[]byte{0x00, 0x00, 0x00, 0x00, 0x49, 0x5f, 0xab, 0x29},
 		},
 		// Type not supported by the "fast" path and requires reflection.
 		{

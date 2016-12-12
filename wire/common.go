@@ -12,7 +12,6 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"io"
-	"time"
 )
 
 // ReadElement reads the next sequence of bytes from r using big endian
@@ -95,16 +94,6 @@ func ReadElement(r io.Reader, element interface{}) error {
 		if err != nil {
 			return err
 		}
-		return nil
-
-	// Message timestamp.
-	case *time.Time:
-		b := scratch[0:8]
-		_, err := io.ReadFull(r, b)
-		if err != nil {
-			return err
-		}
-		*e = time.Unix(int64(binary.BigEndian.Uint64(b)), 0)
 		return nil
 
 	// IP address.
@@ -248,16 +237,6 @@ func WriteElement(w io.Writer, element interface{}) error {
 	// Message header command.
 	case [CommandSize]uint8:
 		_, err := w.Write(e[:])
-		if err != nil {
-			return err
-		}
-		return nil
-
-	// Message timestamp.
-	case time.Time:
-		b := scratch[0:8]
-		binary.BigEndian.PutUint64(b, uint64(e.Unix()))
-		_, err := w.Write(b)
 		if err != nil {
 			return err
 		}

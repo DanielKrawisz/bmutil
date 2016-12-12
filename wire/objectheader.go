@@ -34,16 +34,21 @@ const (
 // defined in the Bitmessage protocol.
 type ObjectHeader struct {
 	Nonce        uint64
-	ExpiresTime  time.Time
+	expiration   uint64
 	ObjectType   ObjectType
 	Version      uint64
 	StreamNumber uint64
 }
 
+// Expiration provides the expration time.
+func (h *ObjectHeader) Expiration() time.Time {
+	return time.Unix(int64(h.expiration), 0)
+}
+
 // String returns the header in a human-readible string form.
 func (h *ObjectHeader) String() string {
-	return fmt.Sprintf("object: %s v%d, expires: %s, nonce: %d, stream: %d",
-		h.ObjectType, h.Version, h.ExpiresTime, h.Nonce, h.StreamNumber)
+	return fmt.Sprintf("header{Nonce: %d, Expiration: %s, Type: %d, Version:%d, Stream: %d}",
+		h.Nonce, h.Expiration(), h.ObjectType, h.Version, h.StreamNumber)
 }
 
 // Encode encodes the object header to the given writer. Object
@@ -61,7 +66,7 @@ func (h *ObjectHeader) Encode(w io.Writer) error {
 // EncodeForSigning encodes the object header used for signing.
 // It consists of everything in the normal object header except for nonce.
 func (h *ObjectHeader) EncodeForSigning(w io.Writer) error {
-	err := WriteElements(w, h.ExpiresTime, h.ObjectType)
+	err := WriteElements(w, h.expiration, h.ObjectType)
 	if err != nil {
 		return err
 	}
@@ -79,7 +84,7 @@ func (h *ObjectHeader) EncodeForSigning(w io.Writer) error {
 // that order. Read Protocol Specifications for more information.
 func DecodeObjectHeader(r io.Reader) (*ObjectHeader, error) {
 	var header ObjectHeader
-	err := ReadElements(r, &header.Nonce, &header.ExpiresTime, &header.ObjectType)
+	err := ReadElements(r, &header.Nonce, &header.expiration, &header.ObjectType)
 	if err != nil {
 		return nil, err
 	}
@@ -97,4 +102,21 @@ func DecodeObjectHeader(r io.Reader) (*ObjectHeader, error) {
 	header.StreamNumber = streamNumber
 
 	return &header, nil
+}
+
+// NewObjectHeader creates an ObjectHeader from the given parameters.
+func NewObjectHeader(
+	Nonce uint64,
+	Expiration time.Time,
+	ObjectType ObjectType,
+	Version uint64,
+	StreamNumber uint64) *ObjectHeader {
+
+	return &ObjectHeader{
+		Nonce:        Nonce,
+		expiration:   uint64(Expiration.Unix()),
+		ObjectType:   ObjectType,
+		Version:      Version,
+		StreamNumber: StreamNumber,
+	}
 }
