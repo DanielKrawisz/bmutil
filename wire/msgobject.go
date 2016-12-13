@@ -45,7 +45,6 @@ func (t ObjectType) String() string {
 type MsgObject struct {
 	header  *ObjectHeader
 	payload []byte
-	invHash *ShaHash
 }
 
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
@@ -58,8 +57,6 @@ func (msg *MsgObject) Decode(r io.Reader) error {
 	}
 
 	msg.payload, err = ioutil.ReadAll(r)
-
-	msg.invHash = nil
 
 	return err
 }
@@ -102,18 +99,13 @@ func (msg *MsgObject) Payload() []byte {
 	return msg.payload
 }
 
-// MsgObject transforms the PubKeyObject to a *MsgObject.
-func (msg *MsgObject) MsgObject() *MsgObject {
-	return msg
-}
-
 // Check checks if the POW that was done for an object message is sufficient.
 // obj is a byte slice containing the object message.
 func (msg *MsgObject) CheckPow(data pow.Data, refTime time.Time) bool {
 	// calculate ttl from bytes 8-16 that contain ExpiresTime
 	ttl := uint64(msg.Header().Expiration().Unix() - refTime.Unix())
 
-	obj := EncodeMessage(msg)
+	obj := Encode(msg)
 	msgHash := bmutil.Sha512(obj[8:]) // exclude nonce value in the beginning
 	payloadLength := uint64(len(obj))
 
@@ -132,11 +124,8 @@ func (msg *MsgObject) CheckPow(data pow.Data, refTime time.Time) bool {
 // InventoryHash takes double sha512 of the bytes and returns the first half.
 // It calculates inventory hash of the object as required by the protocol.
 func (msg *MsgObject) InventoryHash() *ShaHash {
-	if msg.invHash == nil {
-		hash, _ := NewShaHash(bmutil.DoubleSha512(EncodeMessage(msg))[:32])
-		msg.invHash = hash
-	}
-	return msg.invHash
+	hash, _ := NewShaHash(bmutil.DoubleSha512(Encode(msg))[:32])
+	return hash
 }
 
 // Copy creates a new MsgObject identical to the original after a deep copy.
@@ -146,8 +135,6 @@ func (msg *MsgObject) Copy() *MsgObject {
 	newMsg.payload = make([]byte, len(msg.payload))
 	copy(newMsg.payload, msg.payload)
 	newMsg.header = msg.header
-
-	newMsg.invHash = nil // can be recalculated
 
 	return newMsg
 }

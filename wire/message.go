@@ -42,13 +42,17 @@ const (
 	CmdPong    = "pong"
 )
 
+type Encodable interface {
+	Encode(io.Writer) error
+	Decode(io.Reader) error
+}
+
 // Message is an interface that describes a bitmessage message.  A type that
 // implements Message has complete control over the representation of its data
 // and may therefore contain additional or fewer fields than those which
 // are used directly in the protocol encoded message.
 type Message interface {
-	Decode(io.Reader) error
-	Encode(io.Writer) error
+	Encodable
 	Command() string
 	MaxPayloadLength() int
 }
@@ -314,11 +318,11 @@ func ReadMessage(r io.Reader, bmnet BitmessageNet) (Message, []byte, error) {
 	return msg, buf, err
 }
 
-// EncodeMessage takes a message and returns a representation of it as a byte
+// Encode takes a message and returns a representation of it as a byte
 // array as the message would appear in the database. This array is missing the
 // the standard bitmessage header that goes along with every message sent over
 // the p2p connection.
-func EncodeMessage(msg Message) []byte {
+func Encode(msg Encodable) []byte {
 	var buf bytes.Buffer
 	msg.Encode(&buf)
 	return buf.Bytes()

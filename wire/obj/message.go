@@ -29,6 +29,13 @@ type Message struct {
 	Encrypted []byte
 }
 
+func (msg *Message) decodePayload(r io.Reader) error {
+	var err error
+	msg.Encrypted, err = ioutil.ReadAll(r)
+
+	return err
+}
+
 // Decode decodes r using the bitmessage protocol encoding into the receiver.
 // This is part of the Message interface implementation.
 func (msg *Message) Decode(r io.Reader) error {
@@ -44,9 +51,7 @@ func (msg *Message) Decode(r io.Reader) error {
 		return wire.NewMessageError("Decode", str)
 	}
 
-	msg.Encrypted, err = ioutil.ReadAll(r)
-
-	return err
+	return msg.decodePayload(r)
 }
 
 // Encode encodes the receiver to w using the bitmessage protocol encoding.

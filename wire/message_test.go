@@ -552,15 +552,14 @@ func TestEncodeMessageAndMessageHash(t *testing.T) {
 	}
 
 	for i, test := range tests {
-		obj := test.obj.MsgObject()
-		encoded := wire.EncodeMessage(obj)
+		encoded := wire.Encode(test.obj)
 
 		if !bytes.Equal(test.expectedData, encoded) {
 			t.Errorf("On test case %d, expected %v, got %v: ", i, spew.Sdump(test.expectedData), spew.Sdump(encoded))
 		}
 
-		if !test.expectedHash.IsEqual(obj.InventoryHash()) {
-			t.Errorf("On test case %d, expected %v, got %v: ", i, spew.Sdump(test.expectedHash), spew.Sdump(obj.InventoryHash()))
+		if !test.expectedHash.IsEqual(test.obj.InventoryHash()) {
+			t.Errorf("On test case %d, expected %v, got %v: ", i, spew.Sdump(test.expectedHash), spew.Sdump(test.obj.InventoryHash()))
 		}
 	}
 }

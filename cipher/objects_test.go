@@ -33,7 +33,7 @@ func TestPubKeys(t *testing.T) {
 			t.Errorf("For version expected %d got %d", PrivID1.Address.Version,
 				version)
 		}
-		_, err = TryDecryptAndVerifyPubKey(pkMsg.MsgObject(), &PrivID1.Address)
+		_, err = TryDecryptAndVerifyPubKey(pkMsg, &PrivID1.Address)
 		if err != nil {
 			t.Error(err)
 		}
@@ -53,7 +53,7 @@ func TestPubKeys(t *testing.T) {
 			t.Errorf("For version expected %d got %d", PrivID1.Address.Version,
 				version)
 		}
-		pk, err = TryDecryptAndVerifyPubKey(pkMsg.MsgObject(), &v3ID.Address)
+		pk, err = TryDecryptAndVerifyPubKey(pkMsg, &v3ID.Address)
 		if err != nil {
 			t.Error(err)
 		}

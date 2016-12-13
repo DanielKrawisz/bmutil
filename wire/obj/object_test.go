@@ -98,7 +98,7 @@ func TestObject(t *testing.T) {
 	for i, test := range tests {
 		// Encode to wire.format.
 		var buf bytes.Buffer
-		nw, err := wire.WriteMessageN(&buf, test.in.MsgObject(), test.bmnet)
+		nw, err := wire.WriteMessageN(&buf, test.in, test.bmnet)
 		if err != nil {
 			t.Errorf("WriteMessage #%d error %v", i, err)
 			continue
@@ -118,7 +118,7 @@ func TestObject(t *testing.T) {
 				spew.Sdump(msg))
 			continue
 		}
-		if !reflect.DeepEqual(obj.ReadObject(msg.(*wire.MsgObject)), test.out) {
+		if !reflect.DeepEqual(wire.Encode(msg), wire.Encode(test.out)) {
 			t.Errorf("ReadMessage #%d\n got: %v want: %v", i,
 				spew.Sdump(msg), spew.Sdump(test.out))
 			continue
@@ -137,7 +137,7 @@ func TestObject(t *testing.T) {
 	for i, test := range tests {
 		// Encode to wire.format.
 		var buf bytes.Buffer
-		err := wire.WriteMessage(&buf, test.in.MsgObject(), test.bmnet)
+		err := wire.WriteMessage(&buf, test.in, test.bmnet)
 		if err != nil {
 			t.Errorf("WriteMessage #%d error %v", i, err)
 			continue
@@ -151,7 +151,7 @@ func TestObject(t *testing.T) {
 				spew.Sdump(msg))
 			continue
 		}
-		if !reflect.DeepEqual(obj.ReadObject(msg.(*wire.MsgObject)), test.out) {
+		if !reflect.DeepEqual(wire.Encode(msg), wire.Encode(test.out)) {
 			t.Errorf("ReadMessage #%d\n got: %v want: %v", i,
 				spew.Sdump(msg), spew.Sdump(test.out))
 			continue

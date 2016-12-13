@@ -125,21 +125,21 @@ func TestDecodeMsgObject(t *testing.T) {
 			false,
 		},
 		{ // Valid case: PubKey object.
-			wire.EncodeMessage(obj.NewEncryptedPubKey(543, expires, 1, &shahash, []byte{11, 12, 13, 14, 15, 16, 17, 18}).MsgObject()),
+			wire.Encode(obj.NewEncryptedPubKey(543, expires, 1, &shahash, []byte{11, 12, 13, 14, 15, 16, 17, 18}).MsgObject()),
 			false,
 		},
 		{ // Valid case: Msg object.
-			wire.EncodeMessage(obj.NewMessage(765, expires, 1,
+			wire.Encode(obj.NewMessage(765, expires, 1,
 				[]byte{90, 87, 66, 45, 3, 2, 120, 101, 78, 78, 78, 7, 85, 55, 2, 23}).MsgObject()),
 			false,
 		},
 		{ // Valid case: Broadcast object.
-			wire.EncodeMessage(obj.NewTaggedBroadcast(876, expires, 1, &shahash,
+			wire.Encode(obj.NewTaggedBroadcast(876, expires, 1, &shahash,
 				[]byte{90, 87, 66, 45, 3, 2, 120, 101, 78, 78, 78, 7, 85, 55, 2, 23}).MsgObject()),
 			false,
 		},
 		{ // Valid case: unknown object.
-			wire.EncodeMessage(wire.NewMsgObject(wire.NewObjectHeader(345, expires, wire.ObjectType(4), 1, 1), []byte{77, 82, 53, 48, 96, 1})),
+			wire.Encode(wire.NewMsgObject(wire.NewObjectHeader(345, expires, wire.ObjectType(4), 1, 1), []byte{77, 82, 53, 48, 96, 1})),
 			false,
 		},
 	}
@@ -265,11 +265,11 @@ func TestCopy(t *testing.T) {
 			continue
 		}
 
-		if !bytes.Equal(wire.EncodeMessage(test.obj), wire.EncodeMessage(cp)) {
+		if !bytes.Equal(wire.Encode(test.obj), wire.Encode(cp)) {
 			t.Errorf("failed test case %d.", i)
 		}
 		test.obj.Payload()[0]++
-		if bytes.Equal(wire.EncodeMessage(test.obj), wire.EncodeMessage(cp)) {
+		if bytes.Equal(wire.Encode(test.obj), wire.Encode(cp)) {
 			t.Errorf("failed test case %d after original was altered.", i)
 		}
 	}

@@ -18,30 +18,6 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-// TestGetPubKey tests the GetPubKey API.
-func TestGetPubKey(t *testing.T) {
-	// Ensure the command is expected value.
-	now := time.Now()
-	// ripe-based getpubkey message
-	ripeBytes := make([]byte, 20)
-	ripeBytes[0] = 1
-	ripe, err := wire.NewRipeHash(ripeBytes)
-	if err != nil {
-		t.Fatalf("could not make a ripe hash %s", err)
-	}
-	msg := obj.NewGetPubKey(83928, now, 2, 1, ripe, nil)
-
-	// Ensure max payload is expected value for latest protocol version..
-	wantPayload := 70
-	maxPayload := msg.MaxPayloadLength()
-	if maxPayload != wantPayload {
-		t.Errorf("MaxPayloadLength: wrong max payload length for "+
-			"got %v, want %v", maxPayload, wantPayload)
-	}
-
-	return
-}
-
 // TestGetPubKeyWire tests the GetPubKey wire.encode and decode for various numbers
 // of objectentory vectors and protocol versions.
 func TestGetPubKeyWire(t *testing.T) {
