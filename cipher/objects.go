@@ -151,6 +151,10 @@ func TryDecryptAndVerifyBroadcast(msg obj.Broadcast, address *bmutil.Address) (*
 // invalid private or public identities.
 func SignAndEncryptMessage(expiration time.Time, streamNumber uint64,
 	data *Bitmessage, ack []byte, privID *identity.Private, pubID *identity.Public) (*Message, error) {
+	
+	if data.Destination == nil {
+		return nil, errors.New("No destination given.")
+	}
 
 	tmpMsg := obj.NewMessage(0, expiration, streamNumber, nil)
 	message := Message{
