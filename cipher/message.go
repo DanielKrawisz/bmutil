@@ -20,6 +20,11 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 )
 
+const (
+	// AckLength is the length of an ack message.
+	AckLength = 26
+)
+
 // Message is a representation of a message object that includes
 // data which would normally be encrypted.
 type Message struct {
