@@ -328,6 +328,7 @@ func (p *ExtendedPubKey) Encode(w io.Writer) error {
 	return p.encodePayload(w)
 }
 
+// EncodeForSigning encodes the data that is signed.
 func (p *ExtendedPubKey) EncodeForSigning(w io.Writer) error {
 	err := p.header.EncodeForSigning(w)
 	if err != nil {

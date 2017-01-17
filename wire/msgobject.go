@@ -99,7 +99,7 @@ func (msg *MsgObject) Payload() []byte {
 	return msg.payload
 }
 
-// Check checks if the POW that was done for an object message is sufficient.
+// CheckPow checks if the POW that was done for an object message is sufficient.
 // obj is a byte slice containing the object message.
 func (msg *MsgObject) CheckPow(data pow.Data, refTime time.Time) bool {
 	// calculate ttl from bytes 8-16 that contain ExpiresTime

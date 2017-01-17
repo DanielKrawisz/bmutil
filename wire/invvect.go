@@ -24,21 +24,12 @@ const (
 // InvVect defines a bitmessage inventory vector which is used to describe data,
 // as specified by the Type field, that a peer wants, has, or does not have to
 // another peer.
-type InvVect struct {
-	Hash ShaHash // Hash of the data
-}
-
-// NewInvVect returns a new InvVect using the provided hash.
-func NewInvVect(hash *ShaHash) *InvVect {
-	return &InvVect{
-		Hash: *hash,
-	}
-}
+type InvVect ShaHash // Hash of the data
 
 // readInvVect reads an encoded InvVect from r depending on the protocol
 // version.
 func readInvVect(r io.Reader, iv *InvVect) error {
-	err := ReadElements(r, &iv.Hash)
+	err := ReadElements(r, (*ShaHash)(iv))
 	if err != nil {
 		return err
 	}
@@ -47,7 +38,7 @@ func readInvVect(r io.Reader, iv *InvVect) error {
 
 // writeInvVect serializes an InvVect to w depending on the protocol version.
 func writeInvVect(w io.Writer, iv *InvVect) error {
-	err := WriteElements(w, iv.Hash)
+	err := WriteElements(w, (*ShaHash)(iv))
 	if err != nil {
 		return err
 	}

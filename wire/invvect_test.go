@@ -17,26 +17,16 @@ import (
 	"github.com/davecgh/go-spew/spew"
 )
 
-// TestInvVect tests the InvVect API.
-func TestInvVect(t *testing.T) {
-	hash := wire.ShaHash{}
-
-	// Ensure we get the same payload and signature back out.
-	iv := wire.NewInvVect(&hash)
-	if !iv.Hash.IsEqual(&hash) {
-		t.Errorf("NewInvVect: wrong hash - got %v, want %v",
-			spew.Sdump(iv.Hash), spew.Sdump(hash))
-	}
-
+// NewInvVect returns a new InvVect using the provided hash.
+func NewInvVect(hash *wire.ShaHash) *wire.InvVect {
+	return (*wire.InvVect)(hash)
 }
 
 // TestInvVectWire tests the InvVect wire.encode and decode for various
 // protocol versions and supported inventory vector types.
 func TestInvVectWire(t *testing.T) {
 	// errInvVect is an inventory vector with an error.
-	errInvVect := wire.InvVect{
-		Hash: wire.ShaHash{},
-	}
+	errInvVect := wire.InvVect(wire.ShaHash{})
 
 	// errInvVectEncoded is the wire.encoded bytes of errInvVect.
 	errInvVectEncoded := []byte{

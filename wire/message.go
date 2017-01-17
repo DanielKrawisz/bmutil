@@ -42,6 +42,7 @@ const (
 	CmdPong    = "pong"
 )
 
+// Encodable represents a type that can be written to or read from a stream.
 type Encodable interface {
 	Encode(io.Writer) error
 	Decode(io.Reader) error

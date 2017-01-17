@@ -40,7 +40,7 @@ func TestInv(t *testing.T) {
 
 	// Ensure inventory vectors are added properly.
 	hash := wire.ShaHash{}
-	iv := wire.NewInvVect(&hash)
+	iv := NewInvVect(&hash)
 	err := msg.AddInvVect(iv)
 	if err != nil {
 		t.Errorf("AddInvVect: %v", err)
@@ -87,8 +87,8 @@ func TestInvWire(t *testing.T) {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
-	iv := wire.NewInvVect(hash)
-	iv2 := wire.NewInvVect(hash2)
+	iv := NewInvVect(hash)
+	iv2 := NewInvVect(hash2)
 
 	// Empty inv message.
 	NoInv := wire.NewMsgInv()
@@ -174,7 +174,7 @@ func TestInvWireErrors(t *testing.T) {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
-	iv := wire.NewInvVect(hash)
+	iv := NewInvVect(hash)
 
 	// Base inv message used to induce errors.
 	baseInv := wire.NewMsgInv()
