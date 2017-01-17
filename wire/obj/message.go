@@ -99,11 +99,6 @@ func (msg *Message) MsgObject() *wire.MsgObject {
 	return wire.NewMsgObject(msg.header, msg.Encrypted)
 }
 
-// InventoryHash returns the inventory hash of the message.
-func (msg *Message) InventoryHash() *wire.ShaHash {
-	return msg.MsgObject().InventoryHash()
-}
-
 // NewMessage returns a new object message that conforms to the Message interface
 // using the passed parameters and defaults for the remaining fields.
 func NewMessage(nonce pow.Nonce, expiration time.Time, streamNumber uint64, encrypted []byte) *Message {

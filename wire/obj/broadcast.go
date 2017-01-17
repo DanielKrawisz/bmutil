@@ -130,11 +130,6 @@ func (msg *TaglessBroadcast) MsgObject() *wire.MsgObject {
 	return wire.NewMsgObject(msg.header, msg.Payload())
 }
 
-// InventoryHash returns the inv hash of the message.
-func (msg *TaglessBroadcast) InventoryHash() *wire.ShaHash {
-	return msg.MsgObject().InventoryHash()
-}
-
 // Command returns the protocol command string for the message. This is part
 // of the Message interface implementation.
 func (msg *TaglessBroadcast) Command() string {
@@ -259,11 +254,6 @@ func (msg *TaggedBroadcast) Payload() []byte {
 // MsgObject transforms the PubKeyObject to a *MsgObject.
 func (msg *TaggedBroadcast) MsgObject() *wire.MsgObject {
 	return wire.NewMsgObject(msg.header, msg.Payload())
-}
-
-// InventoryHash returns the inv hash of the message.
-func (msg *TaggedBroadcast) InventoryHash() *wire.ShaHash {
-	return msg.MsgObject().InventoryHash()
 }
 
 // Command returns the protocol command string for the message. This is part

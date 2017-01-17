@@ -24,13 +24,18 @@ type Object interface {
 	wire.Message
 	Header() *wire.ObjectHeader
 	Payload() []byte
-	InventoryHash() *wire.ShaHash
 	String() string
 }
 
 type decodableObject interface {
 	Object
 	decodePayload(io.Reader) error
+}
+
+// InventoryHash returns the hash of the object, as defined by the
+// Bitmessage protocol.
+func InventoryHash(obj Object) *wire.ShaHash {
+	return wire.InventoryHash(wire.Encode(obj))
 }
 
 // DecodeObject tries to convert a MsgObject into an an Object.
@@ -43,24 +48,24 @@ func DecodeObject(r io.Reader) (Object, error) {
 	var obj decodableObject
 	switch header.ObjectType {
 	case wire.ObjectTypeGetPubKey:
-		obj = &GetPubKey{header:header}
+		obj = &GetPubKey{header: header}
 	case wire.ObjectTypePubKey:
 		switch header.Version {
 		case SimplePubKeyVersion:
-			obj = &SimplePubKey{header:header}
+			obj = &SimplePubKey{header: header}
 		case ExtendedPubKeyVersion:
-			obj = &ExtendedPubKey{header:header}
+			obj = &ExtendedPubKey{header: header}
 		case EncryptedPubKeyVersion:
-			obj = &EncryptedPubKey{header:header}
+			obj = &EncryptedPubKey{header: header}
 		}
 	case wire.ObjectTypeMsg:
-		obj = &Message{header:header}
+		obj = &Message{header: header}
 	case wire.ObjectTypeBroadcast:
 		switch header.Version {
 		case TaggedBroadcastVersion:
-			obj = &TaggedBroadcast{header:header}
+			obj = &TaggedBroadcast{header: header}
 		case TaglessBroadcastVersion:
-			obj = &TaglessBroadcast{header:header}
+			obj = &TaglessBroadcast{header: header}
 		}
 	}
 

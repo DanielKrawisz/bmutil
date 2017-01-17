@@ -138,11 +138,6 @@ func (msg *GetPubKey) MsgObject() *wire.MsgObject {
 	return wire.NewMsgObject(msg.header, msg.Payload())
 }
 
-// InventoryHash returns the inv hash of the message.
-func (msg *GetPubKey) InventoryHash() *wire.ShaHash {
-	return msg.MsgObject().InventoryHash()
-}
-
 // NewGetPubKey returns a new object message that conforms to the
 // Message interface using the passed parameters and defaults for the remaining
 // fields.

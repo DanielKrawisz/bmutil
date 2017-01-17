@@ -558,8 +558,8 @@ func TestEncodeMessageAndMessageHash(t *testing.T) {
 			t.Errorf("On test case %d, expected %v, got %v: ", i, spew.Sdump(test.expectedData), spew.Sdump(encoded))
 		}
 
-		if !test.expectedHash.IsEqual(test.obj.InventoryHash()) {
-			t.Errorf("On test case %d, expected %v, got %v: ", i, spew.Sdump(test.expectedHash), spew.Sdump(test.obj.InventoryHash()))
+		if !test.expectedHash.IsEqual(obj.InventoryHash(test.obj)) {
+			t.Errorf("On test case %d, expected %v, got %v: ", i, spew.Sdump(test.expectedHash), spew.Sdump(obj.InventoryHash(test.obj)))
 		}
 	}
 }

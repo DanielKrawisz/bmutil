@@ -228,12 +228,6 @@ func (p *SimplePubKey) MsgObject() *wire.MsgObject {
 	return wire.NewMsgObject(p.header, p.Payload())
 }
 
-// InventoryHash is part of the Object interface and returns the invhash of the
-// object.
-func (p *SimplePubKey) InventoryHash() *wire.ShaHash {
-	return p.MsgObject().InventoryHash()
-}
-
 // Behavior returns the PubKey's behavior (currently unused).
 func (p *SimplePubKey) Behavior() uint32 {
 	return p.Data.Behavior
@@ -372,12 +366,6 @@ func (p *ExtendedPubKey) Payload() []byte {
 // the abstract Object to a *MsgObject.
 func (p *ExtendedPubKey) MsgObject() *wire.MsgObject {
 	return wire.NewMsgObject(p.header, p.Payload())
-}
-
-// InventoryHash is part of the Object interface and returns the invhash of the
-// object.
-func (p *ExtendedPubKey) InventoryHash() *wire.ShaHash {
-	return p.MsgObject().InventoryHash()
 }
 
 // Behavior returns the PubKey's behavior (currently unused).
@@ -530,12 +518,6 @@ func (p *EncryptedPubKey) Payload() []byte {
 // the abstract Object to a *MsgObject.
 func (p *EncryptedPubKey) MsgObject() *wire.MsgObject {
 	return wire.NewMsgObject(p.header, p.Payload())
-}
-
-// InventoryHash is part of the Object interface and returns the invhash of the
-// object.
-func (p *EncryptedPubKey) InventoryHash() *wire.ShaHash {
-	return p.MsgObject().InventoryHash()
 }
 
 func (p *EncryptedPubKey) String() string {

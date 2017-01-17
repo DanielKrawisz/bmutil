@@ -12,6 +12,8 @@ import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
+
+	"github.com/DanielKrawisz/bmutil"
 )
 
 // HashSize is the size of the array used to store SHA hashes.
@@ -89,4 +91,11 @@ func NewShaHashFromStr(hash string) (*ShaHash, error) {
 	}
 
 	return NewShaHash(buf)
+}
+
+// InventoryHash takes double sha512 of the bytes and returns the first half.
+// It calculates inventory hash of the object as required by the protocol.
+func InventoryHash(stuff []byte) *ShaHash {
+	hash, _ := NewShaHash(bmutil.DoubleSha512(stuff)[:32])
+	return hash
 }

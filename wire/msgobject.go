@@ -121,13 +121,6 @@ func (msg *MsgObject) CheckPow(data pow.Data, refTime time.Time) bool {
 	return powValue <= target
 }
 
-// InventoryHash takes double sha512 of the bytes and returns the first half.
-// It calculates inventory hash of the object as required by the protocol.
-func (msg *MsgObject) InventoryHash() *ShaHash {
-	hash, _ := NewShaHash(bmutil.DoubleSha512(Encode(msg))[:32])
-	return hash
-}
-
 // Copy creates a new MsgObject identical to the original after a deep copy.
 func (msg *MsgObject) Copy() *MsgObject {
 	newMsg := &MsgObject{}
