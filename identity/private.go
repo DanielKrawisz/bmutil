@@ -20,6 +20,10 @@ import (
 const (
 	// BMPurposeCode is the purpose code used for HD key derivation.
 	BMPurposeCode = 0x80000052
+
+	// BehaviorAck says whether a message to this pubkey should include
+	// an ack.
+	BehaviorAck = 1
 )
 
 // Private contains the identity of the user, which includes private encryption

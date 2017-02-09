@@ -22,13 +22,16 @@ const (
 	// SimplePubKeyVersion is the version in which pubkeys are sent unencrypted
 	// without any details of PoW required by the sender.
 	SimplePubKeyVersion = 2
+	
 	// ExtendedPubKeyVersion is the version in which pubkeys are sent
 	// unencrypted with details of PoW required by the sender.
 	ExtendedPubKeyVersion = 3
+	
 	// EncryptedPubKeyVersion is the version from which pubkeys started to be
 	// sent as an encrypted ExtendedPubKey, decryptable by those who had the
 	// addresses of the owners of those keys.
 	EncryptedPubKeyVersion = 4
+	
 	// SignatureMaxLength consists of 2 256-bit integers encoding using ASN.1
 	// 2*256/8 + 16 (safe encoding boundary). TODO find precise number. Probably
 	// 72.
