@@ -21,8 +21,10 @@ func TestNewPublic(t *testing.T) {
 	id := privId.ToPublic()
 
 	testId := identity.NewPublic(privId.SigningKey.PubKey(),
-		privId.EncryptionKey.PubKey(), pow.DefaultNonceTrialsPerByte,
-		pow.DefaultExtraBytes, 4, 1)
+		privId.DecryptionKey.PubKey(), &pow.Data{
+			NonceTrialsPerByte: pow.DefaultNonceTrialsPerByte,
+			ExtraBytes:         pow.DefaultExtraBytes,
+		}, 4, 1)
 
 	if !reflect.DeepEqual(id, testId) {
 		t.Errorf("Created public identity not equal to original.")

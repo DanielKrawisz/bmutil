@@ -12,6 +12,8 @@ import (
 
 	"github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/pow"
+	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/wire/obj"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil/hdkeychain"
 	"golang.org/x/crypto/ripemd160"
@@ -33,7 +35,7 @@ type Private struct {
 	bmutil.Address
 	pow.Data
 	SigningKey    *btcec.PrivateKey
-	EncryptionKey *btcec.PrivateKey
+	DecryptionKey *btcec.PrivateKey
 	Behavior      uint32
 }
 
@@ -45,8 +47,27 @@ func (id *Private) ToPublic() *Public {
 			NonceTrialsPerByte: id.NonceTrialsPerByte,
 			ExtraBytes:         id.ExtraBytes,
 		},
-		SigningKey:    id.SigningKey.PubKey(),
-		EncryptionKey: id.EncryptionKey.PubKey(),
+		VerificationKey: id.SigningKey.PubKey(),
+		EncryptionKey:   id.DecryptionKey.PubKey(),
+	}
+}
+
+// ToPubKeyData turns a Private identity object into PubKeyData type.
+func (id *Private) ToPubKeyData() *obj.PubKeyData {
+	var verKey, encKey wire.PubKey
+	vk := id.SigningKey.PubKey().SerializeUncompressed()[1:]
+	ek := id.DecryptionKey.PubKey().SerializeUncompressed()[1:]
+	copy(verKey[:], vk)
+	copy(encKey[:], ek)
+
+	return &obj.PubKeyData{
+		Pow: &pow.Data{
+			NonceTrialsPerByte: id.NonceTrialsPerByte,
+			ExtraBytes:         id.ExtraBytes,
+		},
+		VerificationKey: &verKey,
+		EncryptionKey:   &encKey,
+		Behavior:        id.Behavior,
 	}
 }
 
@@ -71,7 +92,7 @@ func NewRandom(initialZeros int) (*Private, error) {
 	// Go through loop to encryption keys with required num. of zeros
 	for {
 		// Generate encryption keys
-		id.EncryptionKey, err = btcec.NewPrivateKey(btcec.S256())
+		id.DecryptionKey, err = btcec.NewPrivateKey(btcec.S256())
 		if err != nil {
 			return nil, err
 		}
@@ -100,7 +121,7 @@ func NewDeterministic(passphrase string, initialZeros uint64, n int) ([]*Private
 	var b bytes.Buffer
 
 	// set the nonces
-	var signingKeyNonce, encryptionKeyNonce uint64 = 0, 1
+	var signingKeyNonce, decryptionKeyNonce uint64 = 0, 1
 
 	initialZeroBytes := make([]byte, initialZeros) // used for comparison
 	sha := sha512.New()
@@ -122,16 +143,16 @@ func NewDeterministic(passphrase string, initialZeros uint64, n int) ([]*Private
 
 			// Create encryption keys
 			b.WriteString(passphrase)
-			bmutil.WriteVarInt(&b, encryptionKeyNonce)
+			bmutil.WriteVarInt(&b, decryptionKeyNonce)
 			sha.Reset()
 			sha.Write(b.Bytes())
 			b.Reset()
-			id.EncryptionKey, _ = btcec.PrivKeyFromBytes(btcec.S256(),
+			id.DecryptionKey, _ = btcec.PrivKeyFromBytes(btcec.S256(),
 				sha.Sum(nil)[:32])
 
 			// Increment nonces
 			signingKeyNonce += 2
-			encryptionKeyNonce += 2
+			decryptionKeyNonce += 2
 
 			// We found our hash!
 			if bytes.Equal(id.hash()[0:initialZeros], initialZeroBytes) {
@@ -194,7 +215,7 @@ func NewHD(masterKey *hdkeychain.ExtendedKey, n uint32, stream uint32) (*Private
 		if err != nil {
 			continue
 		}
-		id.EncryptionKey, _ = encKey.ECPrivKey()
+		id.DecryptionKey, _ = encKey.ECPrivKey()
 
 		// We found our hash!
 		if h := id.hash(); h[0] == 0x00 { // First byte should be zero.
@@ -214,7 +235,7 @@ func (id *Private) setDefaultPOWParams() {
 
 // ImportWIF creates a Private identity from the Bitmessage address and Wallet
 // Import Format (WIF) signing and encryption keys.
-func ImportWIF(address, signingKeyWif, encryptionKeyWif string,
+func ImportWIF(address, signingKeyWif, decryptionKeyWif string,
 	nonceTrials, extraBytes uint64) (*Private, error) {
 	// (Try to) decode address
 	addr, err := bmutil.DecodeAddress(address)
@@ -227,7 +248,7 @@ func ImportWIF(address, signingKeyWif, encryptionKeyWif string,
 		err = errors.New("signing key decode failed: " + err.Error())
 		return nil, err
 	}
-	privEncryptionKey, err := bmutil.DecodeWIF(encryptionKeyWif)
+	privDecryptionKey, err := bmutil.DecodeWIF(decryptionKeyWif)
 	if err != nil {
 		err = errors.New("encryption key decode failed: " + err.Error())
 		return nil, err
@@ -236,7 +257,7 @@ func ImportWIF(address, signingKeyWif, encryptionKeyWif string,
 	priv := &Private{
 		Address:       *addr,
 		SigningKey:    privSigningKey,
-		EncryptionKey: privEncryptionKey,
+		DecryptionKey: privDecryptionKey,
 		Data: pow.Data{
 			NonceTrialsPerByte: nonceTrials,
 			ExtraBytes:         extraBytes,
@@ -254,7 +275,7 @@ func ImportWIF(address, signingKeyWif, encryptionKeyWif string,
 // ExportWIF exports a Private identity to WIF for storage on disk or use by
 // other software. It exports the address, private signing key and private
 // encryption key.
-func (id *Private) ExportWIF() (address, signingKeyWif, encryptionKeyWif string,
+func (id *Private) ExportWIF() (address, signingKeyWif, decryptionKeyWif string,
 	err error) {
 
 	copy(id.Address.Ripe[:], id.hash())
@@ -264,17 +285,17 @@ func (id *Private) ExportWIF() (address, signingKeyWif, encryptionKeyWif string,
 		return
 	}
 	signingKeyWif = bmutil.EncodeWIF(id.SigningKey)
-	encryptionKeyWif = bmutil.EncodeWIF(id.EncryptionKey)
+	decryptionKeyWif = bmutil.EncodeWIF(id.DecryptionKey)
 	return
 }
 
 // hashHelper exists for delegating the task of hash calculation
-func hashHelper(signingKey []byte, encryptionKey []byte) []byte {
+func hashHelper(signingKey []byte, decryptionKey []byte) []byte {
 	sha := sha512.New()
 	ripemd := ripemd160.New()
 
 	sha.Write(signingKey)
-	sha.Write(encryptionKey)
+	sha.Write(decryptionKey)
 
 	ripemd.Write(sha.Sum(nil)) // take ripemd160 of required elements
 	return ripemd.Sum(nil)     // Get the hash
@@ -283,7 +304,7 @@ func hashHelper(signingKey []byte, encryptionKey []byte) []byte {
 // hash returns the ripemd160 hash used in the address
 func (id *Private) hash() []byte {
 	return hashHelper(id.SigningKey.PubKey().SerializeUncompressed(),
-		id.EncryptionKey.PubKey().SerializeUncompressed())
+		id.DecryptionKey.PubKey().SerializeUncompressed())
 }
 
 // CreateAddress populates the Address object within the identity based on the

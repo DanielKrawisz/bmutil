@@ -178,7 +178,7 @@ func (msg Message) verify(private *identity.Private) error {
 // NewMessage attempts to decrypt the data in a message object and turn it
 // into a Message.
 func NewMessage(msg *obj.Message, private *identity.Private) (*Message, error) {
-	dec, err := btcec.Decrypt(private.EncryptionKey, msg.Encrypted)
+	dec, err := btcec.Decrypt(private.DecryptionKey, msg.Encrypted)
 
 	if err == btcec.ErrInvalidMAC { // decryption failed due to invalid key
 		return nil, ErrInvalidIdentity

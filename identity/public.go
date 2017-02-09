@@ -19,9 +19,9 @@ import (
 type Public struct {
 	bmutil.Address
 	pow.Data
-	SigningKey    *btcec.PublicKey
-	EncryptionKey *btcec.PublicKey
-	Behavior      uint32
+	VerificationKey *btcec.PublicKey
+	EncryptionKey   *btcec.PublicKey
+	Behavior        uint32
 }
 
 // CreateAddress populates the Address object within the identity based on the
@@ -34,16 +34,16 @@ func (id *Public) CreateAddress(version, stream uint64) {
 
 // hash returns the ripemd160 hash used in the address
 func (id *Public) hash() []byte {
-	return hashHelper(id.SigningKey.SerializeUncompressed(),
+	return hashHelper(id.VerificationKey.SerializeUncompressed(),
 		id.EncryptionKey.SerializeUncompressed())
 }
 
 // NewPublic creates and initializes an *identity.Public object.
-func NewPublic(signingKey, encryptionKey *btcec.PublicKey, data *pow.Data, addrVersion, addrStream uint64) *Public {
+func NewPublic(verificationKey, encryptionKey *btcec.PublicKey, data *pow.Data, addrVersion, addrStream uint64) *Public {
 
 	id := &Public{
-		EncryptionKey: encryptionKey,
-		SigningKey:    signingKey,
+		EncryptionKey:   encryptionKey,
+		VerificationKey: verificationKey,
 	}
 	// set values appropriately; note that Go zero-initializes everything
 	// so if version is 2, we should have 0 in msg.ExtraBytes and

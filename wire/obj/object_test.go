@@ -69,8 +69,17 @@ func TestObject(t *testing.T) {
 		t.Fatalf("could not create a pubkey %s", err)
 	}
 	var tag wire.ShaHash
-	msgSimplePubKey := obj.NewSimplePubKey(123123, expires, 1, 0, pub1, pub2)
-	msgExtendedPubKey := obj.NewExtendedPubKey(123123, expires, 1, 0, pub1, pub2, &pow.Data{4, 5}, []byte{1, 2, 3})
+	msgSimplePubKey := obj.NewSimplePubKey(123123, expires, 1, &obj.PubKeyData{0, pub1, pub2, nil})
+	msgExtendedPubKey := obj.NewExtendedPubKey(123123, expires, 1,
+		&obj.PubKeyData{
+			Behavior:        0,
+			VerificationKey: pub1,
+			EncryptionKey:   pub2,
+			Pow: &pow.Data{
+				NonceTrialsPerByte: 4,
+				ExtraBytes:         5,
+			},
+		}, []byte{1, 2, 3})
 	msgEncryptedPubKey := obj.NewEncryptedPubKey(123123, expires, 1, &tag, []byte{1, 2, 3, 4, 5})
 
 	enc := make([]byte, 99)

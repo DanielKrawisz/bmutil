@@ -75,7 +75,7 @@ func TestPubKeys(t *testing.T) {
 		}
 		if !bytes.Equal(v2ID.SigningKey.PubKey().SerializeUncompressed()[1:],
 			pk.VerificationKey()[:]) ||
-			!bytes.Equal(v2ID.EncryptionKey.PubKey().SerializeUncompressed()[1:],
+			!bytes.Equal(v2ID.DecryptionKey.PubKey().SerializeUncompressed()[1:],
 				pk.EncryptionKey()[:]) {
 			t.Error("Signing/encryption key mismatch.")
 		}
@@ -178,12 +178,28 @@ func TestPubKeys(t *testing.T) {
 		{obj.NewEncryptedPubKey(0, time.Now().Add(time.Minute*5), 1, Tag1, undecData), &PrivID1.Address},
 
 		// Invalid embedded signing key.
-		{obj.NewExtendedPubKey(0, time.Now().Add(time.Minute*5), 1, 0,
-			&wire.PubKey{}, nil, &pow.Data{1000, 1000}, nil), &PrivID1.Address},
+		{obj.NewExtendedPubKey(0, time.Now().Add(time.Minute*5), 1,
+			&obj.PubKeyData{
+				Behavior:        0,
+				VerificationKey: &wire.PubKey{},
+				EncryptionKey:   nil,
+				Pow: &pow.Data{
+					NonceTrialsPerByte: 1000,
+					ExtraBytes:         1000,
+				},
+			}, nil), &PrivID1.Address},
 
 		// Invalid embedded encryption key.
-		{obj.NewExtendedPubKey(0, time.Now().Add(time.Minute*5), 1, 0,
-			validPubKey, &wire.PubKey{}, &pow.Data{1000, 1000}, nil),
+		{obj.NewExtendedPubKey(0, time.Now().Add(time.Minute*5), 1,
+			&obj.PubKeyData{
+				Behavior:        0,
+				VerificationKey: validPubKey,
+				EncryptionKey:   &wire.PubKey{},
+				Pow: &pow.Data{
+					NonceTrialsPerByte: 1000,
+					ExtraBytes:         1000,
+				},
+			}, nil),
 			&PrivID1.Address},
 
 		// Surreptitous forwarding attack.
@@ -393,7 +409,7 @@ func TestMessages(t *testing.T) {
 
 	randId, _ := btcec.NewPrivateKey(btcec.S256())
 	invPrivID, _ := btcec.Encrypt(randId.PubKey(), []byte{0x00, 0x00})
-	undecData, _ := btcec.Encrypt(PrivID1.EncryptionKey.PubKey(),
+	undecData, _ := btcec.Encrypt(PrivID1.DecryptionKey.PubKey(),
 		[]byte{0x00, 0x00})
 	validPubkey, _ := wire.NewPubKey(randId.PubKey().SerializeUncompressed()[1:])
 

@@ -27,14 +27,14 @@ func init() {
 		"5K3oNuMzVEWdrtyBAZXrPQwQTSmCGrAZS1groRDQVGDeccLim15",
 		"5HzhkuimkuizxJyw9b7qnFEMtUrAXD25Y5AV1sZ964dSSXReKnb",
 		pow.DefaultNonceTrialsPerByte, pow.DefaultExtraBytes)
-	EncKey1, _ = wire.NewPubKey(PrivID1.EncryptionKey.PubKey().SerializeUncompressed()[1:])
+	EncKey1, _ = wire.NewPubKey(PrivID1.DecryptionKey.PubKey().SerializeUncompressed()[1:])
 	SignKey1, _ = wire.NewPubKey(PrivID1.SigningKey.PubKey().SerializeUncompressed()[1:])
 
 	PrivID2, _ = identity.ImportWIF("BM-2cTLMh1CufXWQ9co4CWzD9muDZP4a7N4MA",
 		"5Jw6Gtjy8RCZ5BmTtyx3VykzdXvX4WyWsGu2wLrhfTv8zgKfo7C",
 		"5JY8Lsf5cmNTrXXj1e7FkvCZVYgsK7tAiiocTDtVKLBvQm1EsFw",
 		pow.DefaultNonceTrialsPerByte, pow.DefaultExtraBytes)
-	EncKey2, _ = wire.NewPubKey(PrivID2.EncryptionKey.PubKey().SerializeUncompressed()[1:])
+	EncKey2, _ = wire.NewPubKey(PrivID2.DecryptionKey.PubKey().SerializeUncompressed()[1:])
 	SignKey2, _ = wire.NewPubKey(PrivID2.SigningKey.PubKey().SerializeUncompressed()[1:])
 
 	Tag1, _ = wire.NewShaHash(PrivID1.Address.Tag())
@@ -63,7 +63,7 @@ func TstGenerateInvalidSig() []byte {
 	var b bytes.Buffer
 	attackPub := new(decryptedPubKey)
 	attackPub.data = &obj.PubKeyData{}
-	attackPub.data.EncryptionKey, _ = wire.NewPubKey(PrivID1.EncryptionKey.PubKey().SerializeUncompressed()[1:])
+	attackPub.data.EncryptionKey, _ = wire.NewPubKey(PrivID1.DecryptionKey.PubKey().SerializeUncompressed()[1:])
 	attackPub.data.VerificationKey, _ = wire.NewPubKey(PrivID1.SigningKey.PubKey().SerializeUncompressed()[1:])
 	attackPub.signature = []byte{0x00}
 	attackPub.EncodeForEncryption(&b)
@@ -82,11 +82,11 @@ func TstGenerateMismatchSig() []byte {
 	attackPub := new(decryptedPubKey)
 	attackPub.object = obj.NewEncryptedPubKey(0, time.Time{}, 0, Tag1, nil)
 	attackPub.data = &obj.PubKeyData{}
-	attackPub.data.EncryptionKey, _ = wire.NewPubKey(PrivID1.EncryptionKey.PubKey().SerializeUncompressed()[1:])
+	attackPub.data.EncryptionKey, _ = wire.NewPubKey(PrivID1.DecryptionKey.PubKey().SerializeUncompressed()[1:])
 	attackPub.data.VerificationKey, _ = wire.NewPubKey(PrivID1.SigningKey.PubKey().SerializeUncompressed()[1:])
 	attackPub.EncodeForSigning(&b)
 	// should actually be hash
-	sig, _ := PrivID1.EncryptionKey.Sign(b.Bytes())
+	sig, _ := PrivID1.DecryptionKey.Sign(b.Bytes())
 	attackPub.signature = sig.Serialize()
 
 	b.Reset()
@@ -113,10 +113,15 @@ func tstNewExtendedPubKey(nonce pow.Nonce, expires time.Time, streamNumber uint6
 	behavior uint32, signingKey, encKey *wire.PubKey, nonceTrials,
 	extraBytes uint64, signature []byte) *obj.ExtendedPubKey {
 
-	return obj.NewExtendedPubKey(0, expires, streamNumber, behavior,
-		signingKey, encKey, &pow.Data{
-			NonceTrialsPerByte: nonceTrials,
-			ExtraBytes:         extraBytes,
+	return obj.NewExtendedPubKey(0, expires, streamNumber,
+		&obj.PubKeyData{
+			Behavior:        behavior,
+			VerificationKey: signingKey,
+			EncryptionKey:   encKey,
+			Pow: &pow.Data{
+				NonceTrialsPerByte: nonceTrials,
+				ExtraBytes:         extraBytes,
+			},
 		}, signature)
 }
 
@@ -277,7 +282,7 @@ func TstGenerateBroadcastErrorData(validPubkey *wire.PubKey) (invSigningKey,
 
 	b.Reset()
 	sk, _ := wire.NewPubKey(PrivID1.SigningKey.PubKey().SerializeUncompressed()[1:])
-	ek, _ := wire.NewPubKey(PrivID1.EncryptionKey.PubKey().SerializeUncompressed()[1:])
+	ek, _ := wire.NewPubKey(PrivID1.DecryptionKey.PubKey().SerializeUncompressed()[1:])
 	attackB, _ = TstNewBroadcast(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 		1, Tag1, nil, 4, 1, 0, sk, ek, 0, 0, 1, []byte{0x00}, nil, nil)
 	attackB.encodeForEncryption(&b)
@@ -287,7 +292,7 @@ func TstGenerateBroadcastErrorData(validPubkey *wire.PubKey) (invSigningKey,
 	b.Reset()
 	attackB.encodeForSigning(&b)
 	// should actually be hash
-	sig, _ := PrivID1.EncryptionKey.Sign(b.Bytes())
+	sig, _ := PrivID1.DecryptionKey.Sign(b.Bytes())
 	attackB.signature = sig.Serialize()
 	b.Reset()
 	attackB.encodeForEncryption(&b)
@@ -380,30 +385,30 @@ func TstGenerateMessageErrorData(validPubkey *wire.PubKey) (invDest,
 	attackB := TstNewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 		1, nil, 0, 0, 0, &wire.PubKey{}, &wire.PubKey{}, 0, 0, &wire.RipeHash{}, 1, []byte{0x00}, []byte{}, nil)
 	attackB.encodeForEncryption(&b)
-	invDest, _ = btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
+	invDest, _ = btcec.Encrypt(PrivID1.DecryptionKey.PubKey(), b.Bytes())
 
 	b.Reset()
 	attackB.data.SigningKey = &wire.PubKey{}
 	attackB.data.EncryptionKey = validPubkey
 	attackB.data.Destination, _ = wire.NewRipeHash(PrivID1.Address.Ripe[:])
 	attackB.encodeForEncryption(&b)
-	invSigningKey, _ = btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
+	invSigningKey, _ = btcec.Encrypt(PrivID1.DecryptionKey.PubKey(), b.Bytes())
 
 	b.Reset()
-	attackB.data.EncryptionKey, _ = wire.NewPubKey(PrivID2.EncryptionKey.PubKey().SerializeUncompressed()[1:])
+	attackB.data.EncryptionKey, _ = wire.NewPubKey(PrivID2.DecryptionKey.PubKey().SerializeUncompressed()[1:])
 	attackB.data.SigningKey, _ = wire.NewPubKey(PrivID2.SigningKey.PubKey().SerializeUncompressed()[1:])
 	attackB.signature = []byte{0x00}
 	attackB.encodeForEncryption(&b)
-	invalidSig, _ = btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
+	invalidSig, _ = btcec.Encrypt(PrivID1.DecryptionKey.PubKey(), b.Bytes())
 
 	b.Reset()
 	attackB.encodeForSigning(&b)
 	// should actually be hash
-	sig, _ := PrivID1.EncryptionKey.Sign(b.Bytes())
+	sig, _ := PrivID1.DecryptionKey.Sign(b.Bytes())
 	attackB.signature = sig.Serialize()
 	b.Reset()
 	attackB.encodeForEncryption(&b)
-	mismatchSig, _ = btcec.Encrypt(PrivID1.EncryptionKey.PubKey(), b.Bytes())
+	mismatchSig, _ = btcec.Encrypt(PrivID1.DecryptionKey.PubKey(), b.Bytes())
 
 	return
 }

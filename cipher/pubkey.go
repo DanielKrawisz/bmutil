@@ -40,13 +40,7 @@ type PubKey interface {
 func createSimplePubKey(expires time.Time, streamNumber uint64,
 	behavior uint32, privID *identity.Private) *obj.SimplePubKey {
 
-	var signingKey, encKey wire.PubKey
-	sk := privID.SigningKey.PubKey().SerializeUncompressed()[1:]
-	ek := privID.EncryptionKey.PubKey().SerializeUncompressed()[1:]
-	copy(signingKey[:], sk)
-	copy(encKey[:], ek)
-
-	return obj.NewSimplePubKey(0, expires, streamNumber, behavior, &signingKey, &encKey)
+	return obj.NewSimplePubKey(0, expires, streamNumber, privID.ToPubKeyData())
 }
 
 // sign signs an extendedPubKey, populating the
@@ -111,14 +105,7 @@ func verifyExtendedPubKey(ep *obj.ExtendedPubKey) error {
 func createExtendedPubKey(expires time.Time, streamNumber uint64,
 	behavior uint32, privID *identity.Private) (*obj.ExtendedPubKey, error) {
 
-	var signingKey, encKey wire.PubKey
-	sk := privID.SigningKey.PubKey().SerializeUncompressed()[1:]
-	ek := privID.EncryptionKey.PubKey().SerializeUncompressed()[1:]
-	copy(signingKey[:], sk)
-	copy(encKey[:], ek)
-
-	pk := obj.NewExtendedPubKey(0, expires, streamNumber, behavior,
-		&signingKey, &encKey, &privID.Data, nil)
+	pk := obj.NewExtendedPubKey(0, expires, streamNumber, privID.ToPubKeyData(), nil)
 
 	err := signExtendedPubKey(pk, privID)
 	if err != nil {
@@ -315,20 +302,9 @@ func createDecryptedPubKey(expires time.Time, streamNumber uint64,
 	var tag wire.ShaHash
 	copy(tag[:], addr.Tag())
 
-	var signingKey, encKey wire.PubKey
-	sk := privID.SigningKey.PubKey().SerializeUncompressed()[1:]
-	ek := privID.EncryptionKey.PubKey().SerializeUncompressed()[1:]
-	copy(signingKey[:], sk)
-	copy(encKey[:], ek)
-
 	dp := &decryptedPubKey{
 		object: obj.NewEncryptedPubKey(0, expires, streamNumber, &tag, nil),
-		data: &obj.PubKeyData{
-			Behavior:        behavior,
-			VerificationKey: &signingKey,
-			EncryptionKey:   &encKey,
-			Pow:             &privID.Data,
-		},
+		data:   privID.ToPubKeyData(),
 	}
 
 	err := dp.signAndEncrypt(privID)

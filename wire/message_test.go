@@ -98,7 +98,7 @@ func TestMessage(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create a pubkey %s", err)
 	}
-	msgPubKey := obj.NewSimplePubKey(123123, expires, 1, 0, pub1, pub2)
+	msgPubKey := obj.NewSimplePubKey(123123, expires, 1, &obj.PubKeyData{0, pub1, pub2, nil})
 
 	enc := make([]byte, 99)
 	msgMsg := obj.NewMessage(123123, expires, 1, enc)

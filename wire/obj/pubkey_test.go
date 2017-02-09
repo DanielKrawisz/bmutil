@@ -24,8 +24,22 @@ func TestPubKey(t *testing.T) {
 
 	now := time.Now()
 	tests := []wire.Message{
-		obj.NewSimplePubKey(83928, now, 1, 0, pubKey1, pubKey2),
-		obj.NewExtendedPubKey(83928, now, 1, 0, pubKey1, pubKey2, &pow.Data{0, 0}, []byte{0, 0, 0}),
+		obj.NewSimplePubKey(83928, now, 1,
+			&obj.PubKeyData{
+				Behavior:        0,
+				VerificationKey: pubKey1,
+				EncryptionKey:   pubKey2,
+			}),
+		obj.NewExtendedPubKey(83928, now, 1,
+			&obj.PubKeyData{
+				Behavior:        0,
+				VerificationKey: pubKey1,
+				EncryptionKey:   pubKey2,
+				Pow: &pow.Data{
+					NonceTrialsPerByte: 0,
+					ExtraBytes:         0,
+				},
+			}, []byte{0, 0, 0}),
 		obj.NewEncryptedPubKey(83928, now, 1, tag, []byte{1, 1, 1}),
 	}
 
@@ -55,8 +69,18 @@ func TestPubKeyWire(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	sig := make([]byte, 64)
 	encrypted := make([]byte, 512)
-	msgBase := obj.NewSimplePubKey(83928, expires, 1, 0, pubKey1, pubKey2)
-	msgExpanded := obj.NewExtendedPubKey(83928, expires, 1, 0, pubKey1, pubKey2, &pow.Data{0, 0}, sig)
+	msgBase := obj.NewSimplePubKey(83928, expires, 1,
+		&obj.PubKeyData{0, pubKey1, pubKey2, nil})
+	msgExpanded := obj.NewExtendedPubKey(83928, expires, 1,
+		&obj.PubKeyData{
+			Behavior:        0,
+			VerificationKey: pubKey1,
+			EncryptionKey:   pubKey2,
+			Pow: &pow.Data{
+				NonceTrialsPerByte: 0,
+				ExtraBytes:         0,
+			},
+		}, sig)
 	tagBytes := make([]byte, 32)
 	tagBytes[0] = 1
 	tag, err := wire.NewShaHash(tagBytes)

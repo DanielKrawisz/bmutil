@@ -22,16 +22,16 @@ const (
 	// SimplePubKeyVersion is the version in which pubkeys are sent unencrypted
 	// without any details of PoW required by the sender.
 	SimplePubKeyVersion = 2
-	
+
 	// ExtendedPubKeyVersion is the version in which pubkeys are sent
 	// unencrypted with details of PoW required by the sender.
 	ExtendedPubKeyVersion = 3
-	
+
 	// EncryptedPubKeyVersion is the version from which pubkeys started to be
 	// sent as an encrypted ExtendedPubKey, decryptable by those who had the
 	// addresses of the owners of those keys.
 	EncryptedPubKeyVersion = 4
-	
+
 	// SignatureMaxLength consists of 2 256-bit integers encoding using ASN.1
 	// 2*256/8 + 16 (safe encoding boundary). TODO find precise number. Probably
 	// 72.
@@ -138,8 +138,7 @@ type SimplePubKey struct {
 // NewSimplePubKey returns a new object message that conforms to the Message
 // interface using the passed parameters and defaults for the remaining fields.
 func NewSimplePubKey(nonce pow.Nonce, expiration time.Time,
-	streamNumber uint64, behavior uint32,
-	signingKey, encryptKey *wire.PubKey) *SimplePubKey {
+	streamNumber uint64, data *PubKeyData) *SimplePubKey {
 	return &SimplePubKey{
 		header: wire.NewObjectHeader(
 			nonce,
@@ -149,9 +148,9 @@ func NewSimplePubKey(nonce pow.Nonce, expiration time.Time,
 			streamNumber,
 		),
 		Data: &PubKeyData{
-			Behavior:        behavior,
-			VerificationKey: signingKey,
-			EncryptionKey:   encryptKey,
+			Behavior:        data.Behavior,
+			VerificationKey: data.VerificationKey,
+			EncryptionKey:   data.EncryptionKey,
 		},
 	}
 }
@@ -410,8 +409,7 @@ func (p *ExtendedPubKey) String() string {
 // NewExtendedPubKey returns a new object message that conforms to the Message
 // interface using the passed parameters and defaults for the remaining fields.
 func NewExtendedPubKey(nonce pow.Nonce, expiration time.Time, streamNumber uint64,
-	behavior uint32, signingKey, encryptKey *wire.PubKey, powData *pow.Data,
-	signature []byte) *ExtendedPubKey {
+	data *PubKeyData, signature []byte) *ExtendedPubKey {
 	return &ExtendedPubKey{
 		header: wire.NewObjectHeader(
 			nonce,
@@ -420,12 +418,7 @@ func NewExtendedPubKey(nonce pow.Nonce, expiration time.Time, streamNumber uint6
 			ExtendedPubKeyVersion,
 			streamNumber,
 		),
-		Data: &PubKeyData{
-			Behavior:        behavior,
-			VerificationKey: signingKey,
-			EncryptionKey:   encryptKey,
-			Pow:             powData,
-		},
+		Data:      data,
 		Signature: signature,
 	}
 }
