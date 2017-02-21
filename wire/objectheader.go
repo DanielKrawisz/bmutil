@@ -29,6 +29,7 @@ const (
 	ObjectTypePubKey    ObjectType = 1
 	ObjectTypeMsg       ObjectType = 2
 	ObjectTypeBroadcast ObjectType = 3
+	HighestKnownObjectType ObjectType = ObjectTypeBroadcast
 )
 
 // ObjectHeader is a representation of the header of the object message as
