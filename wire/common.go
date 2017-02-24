@@ -12,6 +12,8 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"io"
+
+	"github.com/DanielKrawisz/bmutil/hash"
 )
 
 // ReadElement reads the next sequence of bytes from r using big endian
@@ -104,14 +106,14 @@ func ReadElement(r io.Reader, element interface{}) error {
 		}
 		return nil
 
-	case *ShaHash:
+	case *hash.Sha:
 		_, err := io.ReadFull(r, e[:])
 		if err != nil {
 			return err
 		}
 		return nil
 
-	case *RipeHash:
+	case *hash.Ripe:
 		_, err := io.ReadFull(r, e[:])
 		if err != nil {
 			return err
@@ -250,14 +252,14 @@ func WriteElement(w io.Writer, element interface{}) error {
 		}
 		return nil
 
-	case *ShaHash:
+	case *hash.Sha:
 		_, err := w.Write(e[:])
 		if err != nil {
 			return err
 		}
 		return nil
 
-	case *RipeHash:
+	case *hash.Ripe:
 		_, err := w.Write(e[:])
 		if err != nil {
 			return err

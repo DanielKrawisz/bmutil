@@ -13,12 +13,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/davecgh/go-spew/spew"
 )
 
 // NewInvVect returns a new InvVect using the provided hash.
-func NewInvVect(hash *wire.ShaHash) *wire.InvVect {
+func NewInvVect(hash *hash.Sha) *wire.InvVect {
 	return (*wire.InvVect)(hash)
 }
 
@@ -26,7 +27,7 @@ func NewInvVect(hash *wire.ShaHash) *wire.InvVect {
 // protocol versions and supported inventory vector types.
 func TestInvVectWire(t *testing.T) {
 	// errInvVect is an inventory vector with an error.
-	errInvVect := wire.InvVect(wire.ShaHash{})
+	errInvVect := wire.InvVect(hash.Sha{})
 
 	// errInvVectEncoded is the wire.encoded bytes of errInvVect.
 	errInvVectEncoded := []byte{

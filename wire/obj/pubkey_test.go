@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/fixed"
@@ -83,7 +84,7 @@ func TestPubKeyWire(t *testing.T) {
 		}, sig)
 	tagBytes := make([]byte, 32)
 	tagBytes[0] = 1
-	tag, err := wire.NewShaHash(tagBytes)
+	tag, err := hash.NewSha(tagBytes)
 	if err != nil {
 		t.Fatalf("could not make a tag hash %s", err)
 	}
@@ -256,7 +257,7 @@ var pubKey2 = &wire.PubKey{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 }
 
-var tag = &wire.ShaHash{
+var tag = &hash.Sha{
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 }

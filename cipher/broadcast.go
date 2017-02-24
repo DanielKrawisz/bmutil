@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/identity"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/obj"
@@ -57,7 +58,7 @@ func (i *incompleteTaglessBroadcast) Encrypt(address *bmutil.Address, data []byt
 type incompleteTaggedBroadcast struct {
 	expiration   time.Time
 	streamNumber uint64
-	tag          *wire.ShaHash
+	tag          *hash.Sha
 }
 
 func (i *incompleteTaggedBroadcast) Encode(w io.Writer) error {
@@ -284,7 +285,7 @@ func CreateTaglessBroadcast(expiration time.Time, data *Bitmessage, private *ide
 
 // CreateTaggedBroadcast creates a Broadcast that we send over the network,
 // as opposed to one that we receive and decrypt.
-func CreateTaggedBroadcast(expires time.Time, data *Bitmessage, tag *wire.ShaHash, private *identity.Private) (*Broadcast, error) {
+func CreateTaggedBroadcast(expires time.Time, data *Bitmessage, tag *hash.Sha, private *identity.Private) (*Broadcast, error) {
 
 	if data.Destination != nil {
 		return nil, errors.New("Broadcasts do not have a destination.")

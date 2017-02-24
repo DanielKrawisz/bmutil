@@ -3,7 +3,7 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire
+package hash
 
 import (
 	"bytes"
@@ -11,42 +11,42 @@ import (
 	"fmt"
 )
 
-// RipeHashSize is the size of array used to store ripe hashes.
-const RipeHashSize = 20
+// RipeSize is the size of array used to store ripe hashes.
+const RipeSize = 20
 
 // RipeHashStringSize is the maximum length of a Ripe hash string.
-const RipeHashStringSize = RipeHashSize * 2
+const RipeHashStringSize = RipeSize * 2
 
 // ErrRipeHashStrSize describes an error that indicates the caller specified
 // a hash string that does not have the right number of characters.
 var ErrRipeHashStrSize = fmt.Errorf("string length must be %v chars", RipeHashStringSize)
 
-// RipeHash is used in several of the bitmessage messages and common
+// Ripe is used in several of the bitmessage messages and common
 // structures. It typically represents the double sha512 of ripemd160
 // of data.
-type RipeHash [RipeHashSize]byte
+type Ripe [RipeSize]byte
 
-// String returns the RipeHash as the hexadecimal string of the byte-reversed
+// String returns the Ripe as the hexadecimal string of the byte-reversed
 // hash.
-func (hash RipeHash) String() string {
+func (hash Ripe) String() string {
 	return hex.EncodeToString(hash[:])
 }
 
 // Bytes returns the bytes which represent the hash as a byte slice.
-func (hash *RipeHash) Bytes() []byte {
-	newHash := make([]byte, RipeHashSize)
+func (hash *Ripe) Bytes() []byte {
+	newHash := make([]byte, RipeSize)
 	copy(newHash, hash[:])
 
 	return newHash
 }
 
 // SetBytes sets the bytes which represent the hash. An error is returned if
-// the number of bytes passed in is not RipeHashSize.
-func (hash *RipeHash) SetBytes(newHash []byte) error {
+// the number of bytes passed in is not RipeSize.
+func (hash *Ripe) SetBytes(newHash []byte) error {
 	nhlen := len(newHash)
-	if nhlen != RipeHashSize {
+	if nhlen != RipeSize {
 		return fmt.Errorf("invalid ripe length of %v, want %v", nhlen,
-			RipeHashSize)
+			RipeSize)
 	}
 	copy(hash[:], newHash)
 
@@ -54,14 +54,14 @@ func (hash *RipeHash) SetBytes(newHash []byte) error {
 }
 
 // IsEqual returns true if target is the same as hash.
-func (hash *RipeHash) IsEqual(target *RipeHash) bool {
+func (hash *Ripe) IsEqual(target *Ripe) bool {
 	return bytes.Equal(hash[:], target[:])
 }
 
-// NewRipeHash returns a new RipeHash from a byte slice. An error is returned if
-// the number of bytes passed in is not RipeHashSize.
-func NewRipeHash(newHash []byte) (*RipeHash, error) {
-	var ripe RipeHash
+// NewRipe returns a new Ripe from a byte slice. An error is returned if
+// the number of bytes passed in is not RipeSize.
+func NewRipe(newHash []byte) (*Ripe, error) {
+	var ripe Ripe
 	err := ripe.SetBytes(newHash)
 	if err != nil {
 		return nil, err
@@ -69,9 +69,9 @@ func NewRipeHash(newHash []byte) (*RipeHash, error) {
 	return &ripe, err
 }
 
-// NewRipeHashFromStr creates a RipeHash from a hash string. The string should
+// NewRipeFromStr creates a Ripe from a hash string. The string should
 // be the hexadecimal string of a byte hash.
-func NewRipeHashFromStr(hash string) (*RipeHash, error) {
+func NewRipeFromStr(hash string) (*Ripe, error) {
 	// Return error if hash string is not the right size.
 	if len(hash) != RipeHashStringSize {
 		return nil, ErrRipeHashStrSize
@@ -82,5 +82,5 @@ func NewRipeHashFromStr(hash string) (*RipeHash, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewRipeHash(buf)
+	return NewRipe(buf)
 }

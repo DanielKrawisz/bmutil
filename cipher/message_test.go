@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/wire/fixed"
 	"github.com/davecgh/go-spew/spew"
 )
@@ -21,7 +21,7 @@ func TestMessageEncryption(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	enc := make([]byte, 128)
 	ripeBytes := make([]byte, 20)
-	ripe, err := wire.NewRipeHash(ripeBytes)
+	ripe, err := hash.NewRipe(ripeBytes)
 	if err != nil {
 		t.Fatalf("could not make a ripe hash %s", err)
 	}
@@ -88,7 +88,7 @@ func TestMessageEncryptError(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	ripeBytes := make([]byte, 20)
 	enc := make([]byte, 128)
-	ripe, _ := wire.NewRipeHash(ripeBytes)
+	ripe, _ := hash.NewRipe(ripeBytes)
 	m := make([]byte, 32)
 	a := make([]byte, 8)
 	s := make([]byte, 16)
@@ -193,7 +193,7 @@ func TestMessageSigning(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	enc := make([]byte, 128)
 	ripeBytes := make([]byte, 20)
-	ripe, err := wire.NewRipeHash(ripeBytes)
+	ripe, err := hash.NewRipe(ripeBytes)
 	if err != nil {
 		t.Fatalf("could not make a ripe hash %s", err)
 	}
@@ -239,7 +239,7 @@ func TestMessageSigningError(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	ripeBytes := make([]byte, 20)
 	enc := make([]byte, 128)
-	ripe, _ := wire.NewRipeHash(ripeBytes)
+	ripe, _ := hash.NewRipe(ripeBytes)
 	m := make([]byte, 32)
 	a := make([]byte, 8)
 	s := make([]byte, 16)

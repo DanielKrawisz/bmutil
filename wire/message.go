@@ -14,7 +14,7 @@ import (
 	"io"
 	"unicode/utf8"
 
-	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/hash"
 )
 
 // MessageHeaderSize is the number of bytes in a bitmessage message header.
@@ -189,7 +189,7 @@ func WriteMessageN(w io.Writer, msg Message, bmnet BitmessageNet) (int, error) {
 	hdr.magic = bmnet
 	hdr.command = cmd
 	hdr.length = uint32(lenp)
-	copy(hdr.checksum[:], bmutil.Sha512(payload)[0:4])
+	copy(hdr.checksum[:], hash.Sha512(payload)[0:4])
 
 	// Encode the header for the message.  This is done to a buffer
 	// rather than directly to the writer since WriteElements doesn't
@@ -292,7 +292,7 @@ func ReadMessageN(r io.Reader, bmnet BitmessageNet) (int, Message, []byte, error
 	}
 
 	// Test checksum.
-	checksum := bmutil.Sha512(payload)[0:4]
+	checksum := hash.Sha512(payload)[0:4]
 	if !bytes.Equal(checksum[:], hdr.checksum[:]) {
 		str := fmt.Sprintf("payload checksum failed - header "+
 			"indicates %v, but actual checksum is %v",

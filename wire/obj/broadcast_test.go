@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/fixed"
 	"github.com/DanielKrawisz/bmutil/wire/obj"
@@ -24,7 +25,7 @@ func TestBroadcast(t *testing.T) {
 	// Ensure the command is expected value.
 	now := time.Now()
 	enc := make([]byte, 99)
-	var tag wire.ShaHash
+	var tag hash.Sha
 	msgs := []wire.Message{
 		obj.NewTaglessBroadcast(83928, now, 1, enc),
 		obj.NewTaggedBroadcast(83928, now, 1, &tag, enc),
@@ -51,7 +52,7 @@ func TestBroadcastWire(t *testing.T) {
 	msgBase := obj.NewTaglessBroadcast(83928, expires, 1, enc)
 
 	tagBytes := make([]byte, 32)
-	tag, err := wire.NewShaHash(tagBytes)
+	tag, err := hash.NewSha(tagBytes)
 	if err != nil {
 		t.Fatalf("could not make a sha hash %s", err)
 	}

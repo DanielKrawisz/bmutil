@@ -9,6 +9,7 @@ import (
 
 	"github.com/DanielKrawisz/bmutil"
 	. "github.com/DanielKrawisz/bmutil/cipher"
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/identity"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
@@ -230,7 +231,7 @@ func TestBroadcasts(t *testing.T) {
 	// SignAndEncryptBroadcast
 
 	// v5 broadcast
-	tag1, _ := wire.NewShaHash(PrivID1.Address.Tag())
+	tag1, _ := hash.NewSha(PrivID1.Address.Tag())
 
 	broadcast1, err := SignAndEncryptBroadcast(
 		TstBroadcastEncryptParams(time.Now().Add(time.Minute*5).Truncate(time.Second),
@@ -367,7 +368,7 @@ func TestBroadcasts(t *testing.T) {
 func TestMessages(t *testing.T) {
 
 	// SignAndEncryptMsg
-	destRipe, _ := wire.NewRipeHash(PrivID2.Address.Ripe[:])
+	destRipe, _ := hash.NewRipe(PrivID2.Address.Ripe[:])
 	message, err := TstSignAndEncryptMessage(0, time.Now().Add(time.Minute*5).
 		Truncate(time.Second), 1, nil, 4, 1, 1, SignKey1, EncKey1, 1000,
 		1000, destRipe, 1, []byte("Hey there!"), []byte{}, nil, PrivID1, PrivID2.ToPublic())

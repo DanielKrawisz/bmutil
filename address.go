@@ -9,6 +9,7 @@ import (
 	"bytes"
 	"errors"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/btcsuite/btcd/btcec"
 	"github.com/btcsuite/btcutil/base58"
 )
@@ -64,7 +65,7 @@ func (addr *Address) Encode() (string, error) {
 	binaryData.Write(ripe)
 
 	// calc checksum from 2 rounds of SHA512
-	checksum := DoubleSha512(binaryData.Bytes())[:4]
+	checksum := hash.DoubleSha512(binaryData.Bytes())[:4]
 
 	totalBin := append(binaryData.Bytes(), checksum...)
 
@@ -85,7 +86,7 @@ func DecodeAddress(address string) (*Address, error) {
 	hashData := data[:len(data)-4]
 	checksum := data[len(data)-4:]
 
-	if !bytes.Equal(checksum, DoubleSha512(hashData)[0:4]) {
+	if !bytes.Equal(checksum, hash.DoubleSha512(hashData)[0:4]) {
 		return nil, ErrChecksumMismatch
 	}
 	// create the address
@@ -143,14 +144,14 @@ func (addr *Address) calcSingleHash() []byte {
 	WriteVarInt(&b, addr.Stream)
 	b.Write(addr.Ripe[:])
 
-	return Sha512(b.Bytes())
+	return hash.Sha512(b.Bytes())
 }
 
 // calcDoubleHash calculates the double sha512 sum of the address, the first
 // half of which is used as private encryption key for the public key object
 // and the second half is used as a tag.
 func (addr *Address) calcDoubleHash() []byte {
-	return Sha512(addr.calcSingleHash())
+	return hash.Sha512(addr.calcSingleHash())
 }
 
 // Tag calculates tag corresponding to the Bitmessage address. According to

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/identity"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/obj"
@@ -104,7 +105,7 @@ func TryDecryptAndVerifyPubKey(msg obj.Object, address *bmutil.Address) (PubKey,
 // The private identity supplied should be of the sender. There are no checks
 // against supplying invalid private identity.
 func SignAndEncryptBroadcast(expiration time.Time,
-	msg *Bitmessage, tag *wire.ShaHash, privID *identity.Private) (*Broadcast, error) {
+	msg *Bitmessage, tag *hash.Sha, privID *identity.Private) (*Broadcast, error) {
 
 	if tag == nil {
 		if msg.FromAddressVersion != 2 && msg.FromAddressVersion != 3 {

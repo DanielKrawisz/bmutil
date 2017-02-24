@@ -12,6 +12,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/fixed"
 	"github.com/DanielKrawisz/bmutil/wire/obj"
@@ -24,7 +25,7 @@ func TestGetPubKeyWire(t *testing.T) {
 
 	ripeBytes := make([]byte, 20)
 	ripeBytes[0] = 1
-	ripe, err := wire.NewRipeHash(ripeBytes)
+	ripe, err := hash.NewRipe(ripeBytes)
 	if err != nil {
 		t.Fatalf("could not make a ripe hash %s", err)
 	}
@@ -35,9 +36,9 @@ func TestGetPubKeyWire(t *testing.T) {
 	msgRipe := obj.NewGetPubKey(83928, expires, 2, 1, ripe, nil)
 
 	// empty ripe, something in tag
-	tagBytes := make([]byte, wire.HashSize)
+	tagBytes := make([]byte, hash.ShaSize)
 	tagBytes[0] = 1
-	tag, err := wire.NewShaHash(tagBytes)
+	tag, err := hash.NewSha(tagBytes)
 	if err != nil {
 		t.Fatalf("could not make a tag hash %s", err)
 	}

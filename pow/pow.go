@@ -9,7 +9,7 @@ import (
 	"encoding/binary"
 	"math"
 
-	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/hash"
 )
 
 // CalculateTarget calculates the target POW value. payloadLength includes the
@@ -35,7 +35,7 @@ func DoSequential(target uint64, initialHash []byte) Nonce {
 		nonce++
 		binary.BigEndian.PutUint64(nonceBytes, nonce)
 
-		resultHash := bmutil.DoubleSha512(append(nonceBytes, initialHash...))
+		resultHash := hash.DoubleSha512(append(nonceBytes, initialHash...))
 		trialValue = binary.BigEndian.Uint64(resultHash[:8])
 	}
 	return Nonce(nonce)
@@ -61,7 +61,7 @@ func DoParallel(target uint64, initialHash []byte, parallelCount int) Nonce {
 					nonce += uint64(parallelCount) // increment by parallelCount
 					binary.BigEndian.PutUint64(nonceBytes, nonce)
 
-					resultHash := bmutil.DoubleSha512(append(nonceBytes, initialHash...))
+					resultHash := hash.DoubleSha512(append(nonceBytes, initialHash...))
 					trialValue = binary.BigEndian.Uint64(resultHash[:8])
 				}
 			}

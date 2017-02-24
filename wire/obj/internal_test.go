@@ -7,6 +7,7 @@ package obj
 import (
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
@@ -48,7 +49,7 @@ func TstTaggedBroadcast() *TaggedBroadcast {
 			wire.ObjectTypeBroadcast,
 			TaggedBroadcastVersion,
 			1),
-		Tag: &wire.ShaHash{
+		Tag: &hash.Sha{
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 		},
@@ -96,7 +97,7 @@ func TstBaseGetPubKey() *GetPubKey {
 			wire.ObjectTypeGetPubKey,
 			3,
 			1),
-		Ripe: &wire.RipeHash{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		Ripe: &hash.Ripe{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		Tag:  nil,
 	}
 }
@@ -111,7 +112,7 @@ func TstTagGetPubKey() *GetPubKey {
 			4,
 			1),
 		Ripe: nil,
-		Tag: &wire.ShaHash{
+		Tag: &hash.Sha{
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 			0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 	}
@@ -126,7 +127,7 @@ func TstInvalidGetPubKeyVersion() *GetPubKey {
 			wire.ObjectTypeGetPubKey,
 			5,
 			1),
-		Ripe: &wire.RipeHash{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+		Ripe: &hash.Ripe{1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 		Tag:  nil,
 	}
 }
@@ -191,7 +192,7 @@ func TstExpandedPubKey(pub1, pub2 *wire.PubKey) *ExtendedPubKey {
 	}
 }
 
-func TstEncryptedPubKey(tag *wire.ShaHash) *EncryptedPubKey {
+func TstEncryptedPubKey(tag *hash.Sha) *EncryptedPubKey {
 	return &EncryptedPubKey{
 		header: wire.NewObjectHeader(
 			123123, // 0x1e0f3

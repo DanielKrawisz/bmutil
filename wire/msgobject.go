@@ -14,7 +14,7 @@ import (
 	"io/ioutil"
 	"time"
 
-	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/pow"
 )
 
@@ -106,13 +106,13 @@ func (msg *MsgObject) CheckPow(data pow.Data, refTime time.Time) bool {
 	ttl := uint64(msg.Header().Expiration().Unix() - refTime.Unix())
 
 	obj := Encode(msg)
-	msgHash := bmutil.Sha512(obj[8:]) // exclude nonce value in the beginning
+	msgHash := hash.Sha512(obj[8:]) // exclude nonce value in the beginning
 	payloadLength := uint64(len(obj))
 
 	hashData := make([]byte, 8+len(msgHash))
 	copy(hashData[:8], obj[:8]) // nonce
 	copy(hashData[8:], msgHash)
-	resultHash := bmutil.DoubleSha512(hashData)
+	resultHash := hash.DoubleSha512(hashData)
 
 	powValue := binary.BigEndian.Uint64(resultHash[0:8])
 

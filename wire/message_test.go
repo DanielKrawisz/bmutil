@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/fixed"
 	"github.com/DanielKrawisz/bmutil/wire/obj"
@@ -81,7 +82,7 @@ func TestMessage(t *testing.T) {
 	// ripe-based getpubkey message
 	ripeBytes := make([]byte, 20)
 	ripeBytes[0] = 1
-	ripe, err := wire.NewRipeHash(ripeBytes)
+	ripe, err := hash.NewRipe(ripeBytes)
 	if err != nil {
 		t.Fatalf("could not make a ripe hash %s", err)
 	}
@@ -528,7 +529,7 @@ func TestEncodeMessageAndMessageHash(t *testing.T) {
 	tests := []struct {
 		obj          obj.Object
 		expectedData []byte
-		expectedHash wire.ShaHash
+		expectedHash hash.Sha
 	}{
 		{ // pub key object message.
 			// We don't need to try every different kind of message since they have their own
@@ -543,7 +544,7 @@ func TestEncodeMessageAndMessageHash(t *testing.T) {
 				0x74, 0x75, 0x76, 0x77, 0x78, 0x79, 0x7a, 0x7b,
 				0x7c, 0x7d, 0x7e, 0x7f, 0x80, 0x81, 0x0b, 0x0c,
 				0x0d, 0x0e, 0x0f, 0x10, 0x11, 0x12},
-			wire.ShaHash([wire.HashSize]byte{
+			hash.Sha([hash.ShaSize]byte{
 				0xaa, 0xa5, 0x88, 0xd4, 0x7a, 0xa2, 0x50, 0xfb,
 				0x64, 0x46, 0x38, 0x08, 0x57, 0xa0, 0x6f, 0x9b,
 				0xf7, 0x56, 0xf8, 0xb2, 0xd2, 0xe8, 0x59, 0xdf,

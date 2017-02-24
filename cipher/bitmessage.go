@@ -9,6 +9,7 @@ import (
 
 	"github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/format"
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
@@ -22,7 +23,7 @@ type Bitmessage struct {
 	SigningKey         *wire.PubKey
 	EncryptionKey      *wire.PubKey
 	Pow                *pow.Data
-	Destination        *wire.RipeHash
+	Destination        *hash.Ripe
 	Content            format.Encoding
 }
 
@@ -90,7 +91,7 @@ func (msg *Bitmessage) decodeMessage(r io.Reader) error {
 			return err
 		}
 	}
-	msg.Destination = &wire.RipeHash{}
+	msg.Destination = &hash.Ripe{}
 	if err = wire.ReadElement(r, msg.Destination); err != nil {
 		return err
 	}

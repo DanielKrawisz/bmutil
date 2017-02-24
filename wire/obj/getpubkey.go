@@ -12,6 +12,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
@@ -28,20 +29,20 @@ const (
 // not ripe.
 type GetPubKey struct {
 	header *wire.ObjectHeader
-	Ripe   *wire.RipeHash
-	Tag    *wire.ShaHash
+	Ripe   *hash.Ripe
+	Tag    *hash.Sha
 }
 
 func (msg *GetPubKey) decodePayload(r io.Reader) error {
 	var err error
 	switch msg.header.Version {
 	case TagGetPubKeyVersion:
-		msg.Tag, _ = wire.NewShaHash(make([]byte, wire.HashSize))
+		msg.Tag, _ = hash.NewSha(make([]byte, hash.ShaSize))
 		if err = wire.ReadElement(r, msg.Tag); err != nil {
 			return err
 		}
 	case SimplePubKeyVersion, ExtendedPubKeyVersion:
-		msg.Ripe, _ = wire.NewRipeHash(make([]byte, 20))
+		msg.Ripe, _ = hash.NewRipe(make([]byte, 20))
 		if err = wire.ReadElement(r, msg.Ripe); err != nil {
 			return err
 		}
@@ -142,7 +143,7 @@ func (msg *GetPubKey) MsgObject() *wire.MsgObject {
 // Message interface using the passed parameters and defaults for the remaining
 // fields.
 func NewGetPubKey(nonce pow.Nonce, expiration time.Time, version, streamNumber uint64,
-	ripe *wire.RipeHash, tag *wire.ShaHash) *GetPubKey {
+	ripe *hash.Ripe, tag *hash.Sha) *GetPubKey {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.

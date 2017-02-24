@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
@@ -251,7 +252,7 @@ func (p *SimplePubKey) Pow() *pow.Data {
 }
 
 // Tag return's the key's pow data. For the SimplePubKey, this is nil.
-func (p *SimplePubKey) Tag() *wire.ShaHash {
+func (p *SimplePubKey) Tag() *hash.Sha {
 	return nil
 }
 
@@ -392,7 +393,7 @@ func (p *ExtendedPubKey) Pow() *pow.Data {
 }
 
 // Tag return's the key's pow data. For the SimplePubKey, this is nil.
-func (p *ExtendedPubKey) Tag() *wire.ShaHash {
+func (p *ExtendedPubKey) Tag() *hash.Sha {
 	return nil
 }
 
@@ -426,13 +427,13 @@ func NewExtendedPubKey(nonce pow.Nonce, expiration time.Time, streamNumber uint6
 // EncryptedPubKey represents an encrypted pubkey.
 type EncryptedPubKey struct {
 	header    *wire.ObjectHeader
-	Tag       *wire.ShaHash
+	Tag       *hash.Sha
 	Encrypted []byte
 }
 
 func (p *EncryptedPubKey) decodePayload(r io.Reader) error {
 	var err error
-	p.Tag = &wire.ShaHash{}
+	p.Tag = &hash.Sha{}
 	if err = wire.ReadElement(r, p.Tag); err != nil {
 		return err
 	}
@@ -524,7 +525,7 @@ func (p *EncryptedPubKey) String() string {
 // NewEncryptedPubKey returns a new object message that conforms to the Message
 // interface using the passed parameters and defaults for the remaining fields.
 func NewEncryptedPubKey(nonce pow.Nonce, expiration time.Time,
-	streamNumber uint64, tag *wire.ShaHash, encrypted []byte) *EncryptedPubKey {
+	streamNumber uint64, tag *hash.Sha, encrypted []byte) *EncryptedPubKey {
 	return &EncryptedPubKey{
 		header: wire.NewObjectHeader(
 			nonce,

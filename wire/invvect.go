@@ -10,6 +10,8 @@ package wire
 
 import (
 	"io"
+
+	"github.com/DanielKrawisz/bmutil/hash"
 )
 
 const (
@@ -18,18 +20,18 @@ const (
 	MaxInvPerMsg = 50000
 
 	// Maximum payload size for an inventory vector.
-	maxInvVectPayload = HashSize
+	maxInvVectPayload = hash.ShaSize
 )
 
 // InvVect defines a bitmessage inventory vector which is used to describe data,
 // as specified by the Type field, that a peer wants, has, or does not have to
 // another peer.
-type InvVect ShaHash // Hash of the data
+type InvVect hash.Sha // Hash of the data
 
 // readInvVect reads an encoded InvVect from r depending on the protocol
 // version.
 func readInvVect(r io.Reader, iv *InvVect) error {
-	err := ReadElements(r, (*ShaHash)(iv))
+	err := ReadElements(r, (*hash.Sha)(iv))
 	if err != nil {
 		return err
 	}
@@ -38,7 +40,7 @@ func readInvVect(r io.Reader, iv *InvVect) error {
 
 // writeInvVect serializes an InvVect to w depending on the protocol version.
 func writeInvVect(w io.Writer, iv *InvVect) error {
-	err := WriteElements(w, (*ShaHash)(iv))
+	err := WriteElements(w, (*hash.Sha)(iv))
 	if err != nil {
 		return err
 	}

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/identity"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
@@ -33,7 +34,7 @@ type PubKey interface {
 	VerificationKey() *wire.PubKey
 	EncryptionKey() *wire.PubKey
 	Pow() *pow.Data
-	Tag() *wire.ShaHash
+	Tag() *hash.Sha
 	String() string
 }
 
@@ -145,7 +146,7 @@ func (dp *decryptedPubKey) Pow() *pow.Data {
 	return dp.data.Pow
 }
 
-func (dp *decryptedPubKey) Tag() *wire.ShaHash {
+func (dp *decryptedPubKey) Tag() *hash.Sha {
 	return dp.object.Tag
 }
 
@@ -299,7 +300,7 @@ func createDecryptedPubKey(expires time.Time, streamNumber uint64,
 	behavior uint32, privID *identity.Private) (*decryptedPubKey, error) {
 	addr := &privID.Address
 
-	var tag wire.ShaHash
+	var tag hash.Sha
 	copy(tag[:], addr.Tag())
 
 	dp := &decryptedPubKey{

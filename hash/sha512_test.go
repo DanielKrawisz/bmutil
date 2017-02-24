@@ -6,14 +6,14 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package bmutil_test
+package hash_test
 
 import (
 	"bytes"
 	"encoding/hex"
 	"testing"
 
-	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/hash"
 )
 
 // TestDoubleSha512 checks some test cases for DoubleSha512.
@@ -42,8 +42,8 @@ func TestDoubleSha512(t *testing.T) {
 
 	for _, test := range tests {
 		byteSlice := []byte(test.input)
-		result := bmutil.DoubleSha512(byteSlice)
-		expected := bmutil.Sha512(bmutil.Sha512(byteSlice))
+		result := hash.DoubleSha512(byteSlice)
+		expected := hash.Sha512(hash.Sha512(byteSlice))
 		if !bytes.Equal(expected, result) {
 			t.Errorf("DoubleSha512 fails for case \"%s\" against Sha512: expected %s, got %s", byteSlice, expected, result)
 		}

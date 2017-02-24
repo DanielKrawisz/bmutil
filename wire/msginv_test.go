@@ -14,6 +14,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/fixed"
 	"github.com/davecgh/go-spew/spew"
@@ -39,7 +40,7 @@ func TestInv(t *testing.T) {
 	}
 
 	// Ensure inventory vectors are added properly.
-	hash := wire.ShaHash{}
+	hash := hash.Sha{}
 	iv := NewInvVect(&hash)
 	err := msg.AddInvVect(iv)
 	if err != nil {
@@ -76,19 +77,19 @@ func TestInv(t *testing.T) {
 // of inventory vectors and protocol versions.
 func TestInvWire(t *testing.T) {
 	hashStr := "1ee5d34b208ebe616943fcf2cc1ca0e948cc94f73fa4e94574bc105fa6174376"
-	hash, err := wire.NewShaHashFromStr(hashStr)
+	h, err := hash.NewShaFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
 	hashStr = "d28a3dc7392bf00a9855ee93dd9a81eff82a2c4fe57fbd42cfe71b487accfaf0"
-	hash2, err := wire.NewShaHashFromStr(hashStr)
+	h2, err := hash.NewShaFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}
 
-	iv := NewInvVect(hash)
-	iv2 := NewInvVect(hash2)
+	iv := NewInvVect(h)
+	iv2 := NewInvVect(h2)
 
 	// Empty inv message.
 	NoInv := wire.NewMsgInv()
@@ -169,7 +170,7 @@ func TestInvWireErrors(t *testing.T) {
 	wireErr := &wire.MessageError{}
 
 	hashStr := "1ee5d34b208ebe616943fcf2cc1ca0e948cc94f73fa4e94574bc105fa6174376"
-	hash, err := wire.NewShaHashFromStr(hashStr)
+	hash, err := hash.NewShaFromStr(hashStr)
 	if err != nil {
 		t.Errorf("NewShaHashFromStr: %v", err)
 	}

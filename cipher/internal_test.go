@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/DanielKrawisz/bmutil/format"
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/identity"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
@@ -19,7 +20,7 @@ import (
 
 var PrivID1, PrivID2 *identity.Private
 var EncKey1, SignKey1, EncKey2, SignKey2 *wire.PubKey
-var Tag1, Tag2 *wire.ShaHash
+var Tag1, Tag2 *hash.Sha
 
 // Setup everything
 func init() {
@@ -37,8 +38,8 @@ func init() {
 	EncKey2, _ = wire.NewPubKey(PrivID2.DecryptionKey.PubKey().SerializeUncompressed()[1:])
 	SignKey2, _ = wire.NewPubKey(PrivID2.SigningKey.PubKey().SerializeUncompressed()[1:])
 
-	Tag1, _ = wire.NewShaHash(PrivID1.Address.Tag())
-	Tag2, _ = wire.NewShaHash(PrivID2.Address.Tag())
+	Tag1, _ = hash.NewSha(PrivID1.Address.Tag())
+	Tag2, _ = hash.NewSha(PrivID2.Address.Tag())
 }
 
 func TstGenerateForwardingData(key *wire.PubKey) []byte {
@@ -127,7 +128,7 @@ func tstNewExtendedPubKey(nonce pow.Nonce, expires time.Time, streamNumber uint6
 
 func tstNewDecryptedPubKey(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 	behavior uint32, signingKey, encryptKey *wire.PubKey, nonceTrials,
-	extraBytes uint64, signature []byte, tag *wire.ShaHash, encrypted []byte) *decryptedPubKey {
+	extraBytes uint64, signature []byte, tag *hash.Sha, encrypted []byte) *decryptedPubKey {
 	return &decryptedPubKey{
 		object: obj.NewEncryptedPubKey(nonce, expires, streamNumber, tag, encrypted),
 		data: &obj.PubKeyData{
@@ -159,7 +160,7 @@ func TstNewExtendedPubKey(nonce pow.Nonce, expires time.Time, streamNumber uint6
 
 func TstNewDecryptedPubKey(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 	behavior uint32, signingKey, encKey *wire.PubKey, nonceTrials, extraBytes uint64,
-	signature []byte, tag *wire.ShaHash, encrypted []byte, private *identity.Private) PubKey {
+	signature []byte, tag *hash.Sha, encrypted []byte, private *identity.Private) PubKey {
 
 	dk := tstNewDecryptedPubKey(nonce, expires, streamNumber,
 		behavior, signingKey, encKey, nonceTrials, extraBytes, signature, tag, encrypted)
@@ -183,7 +184,7 @@ func (tb *TstBroadcast) EncodeForSigning(w io.Writer) error {
 }
 
 func TstNewBroadcast(nonce pow.Nonce, expires time.Time, streamNumber uint64,
-	tag *wire.ShaHash, encrypted []byte, fromAddressVersion, fromStreamNumber uint64,
+	tag *hash.Sha, encrypted []byte, fromAddressVersion, fromStreamNumber uint64,
 	behavior uint32, signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes,
 	encoding uint64, message, signature []byte, private *identity.Private) (*Broadcast, *TstBroadcast) {
 
@@ -233,9 +234,9 @@ func TstNewBroadcast(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 }
 
 func TstBroadcastEncryptParams(expires time.Time, streamNumber uint64,
-	tag *wire.ShaHash, fromAddressVersion, fromStreamNumber uint64,
+	tag *hash.Sha, fromAddressVersion, fromStreamNumber uint64,
 	behavior uint32, signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes,
-	encoding uint64, message []byte, private *identity.Private) (time.Time, *Bitmessage, *wire.ShaHash, *identity.Private) {
+	encoding uint64, message []byte, private *identity.Private) (time.Time, *Bitmessage, *hash.Sha, *identity.Private) {
 
 	content, err := format.Read(encoding, message)
 	if err != nil {
@@ -305,7 +306,7 @@ func TstGenerateBroadcastErrorData(validPubkey *wire.PubKey) (invSigningKey,
 func TstNewMessage(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 	encrypted []byte, addressVersion, fromStreamNumber uint64, behavior uint32,
 	signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes uint64,
-	destination *wire.RipeHash, encoding uint64,
+	destination *hash.Ripe, encoding uint64,
 	message, ack, signature []byte) *Message {
 
 	msg := obj.NewMessage(nonce, expires, streamNumber, encrypted)
@@ -338,7 +339,7 @@ func TstNewMessage(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 func TstSignAndEncryptMessage(nonce uint64, expires time.Time, streamNumber uint64,
 	encrypted []byte, addressVersion, fromStreamNumber uint64, behavior uint32,
 	signingKey, encryptKey *wire.PubKey, nonceTrials, extraBytes uint64,
-	destination *wire.RipeHash, encoding uint64,
+	destination *hash.Ripe, encoding uint64,
 	message, ack, signature []byte, privID *identity.Private, pubID *identity.Public) (*Message, error) {
 
 	if encrypted == nil && signature != nil {
@@ -383,14 +384,14 @@ func TstGenerateMessageErrorData(validPubkey *wire.PubKey) (invDest,
 	invSigningKey, invalidSig, mismatchSig []byte) {
 	var b bytes.Buffer
 	attackB := TstNewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
-		1, nil, 0, 0, 0, &wire.PubKey{}, &wire.PubKey{}, 0, 0, &wire.RipeHash{}, 1, []byte{0x00}, []byte{}, nil)
+		1, nil, 0, 0, 0, &wire.PubKey{}, &wire.PubKey{}, 0, 0, &hash.Ripe{}, 1, []byte{0x00}, []byte{}, nil)
 	attackB.encodeForEncryption(&b)
 	invDest, _ = btcec.Encrypt(PrivID1.DecryptionKey.PubKey(), b.Bytes())
 
 	b.Reset()
 	attackB.data.SigningKey = &wire.PubKey{}
 	attackB.data.EncryptionKey = validPubkey
-	attackB.data.Destination, _ = wire.NewRipeHash(PrivID1.Address.Ripe[:])
+	attackB.data.Destination, _ = hash.NewRipe(PrivID1.Address.Ripe[:])
 	attackB.encodeForEncryption(&b)
 	invSigningKey, _ = btcec.Encrypt(PrivID1.DecryptionKey.PubKey(), b.Bytes())
 

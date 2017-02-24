@@ -10,6 +10,7 @@ import (
 	"io"
 	"io/ioutil"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
 
@@ -34,8 +35,8 @@ type decodableObject interface {
 
 // InventoryHash returns the hash of the object, as defined by the
 // Bitmessage protocol.
-func InventoryHash(obj Object) *wire.ShaHash {
-	return wire.InventoryHash(wire.Encode(obj))
+func InventoryHash(obj Object) *hash.Sha {
+	return hash.InventoryHash(wire.Encode(obj))
 }
 
 // DecodeObject tries to convert a MsgObject into an an Object.

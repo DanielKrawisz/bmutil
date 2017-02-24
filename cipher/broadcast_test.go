@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/wire/fixed"
 	"github.com/davecgh/go-spew/spew"
 )
@@ -25,7 +25,7 @@ func TestBroadcastEncrypt(t *testing.T) {
 	m := make([]byte, 32)
 	a := make([]byte, 8)
 	tagBytes := make([]byte, 32)
-	tag, err := wire.NewShaHash(tagBytes)
+	tag, err := hash.NewSha(tagBytes)
 	if err != nil {
 		t.Fatalf("could not make a sha hash %s", err)
 	}
@@ -87,7 +87,7 @@ func TestBroadcastEncryptError(t *testing.T) {
 	m := make([]byte, 32)
 	a := make([]byte, 8)
 	tagBytes := make([]byte, 32)
-	tag, err := wire.NewShaHash(tagBytes)
+	tag, err := hash.NewSha(tagBytes)
 	if err != nil {
 		t.Fatalf("could not make a sha hash %s", err)
 	}
@@ -177,7 +177,7 @@ func TestBroadcastencodeForSigning(t *testing.T) {
 	m := make([]byte, 32)
 	a := make([]byte, 8)
 	tagBytes := make([]byte, 32)
-	tag, err := wire.NewShaHash(tagBytes)
+	tag, err := hash.NewSha(tagBytes)
 	if err != nil {
 		t.Fatalf("could not make a sha hash %s", err)
 	}
@@ -219,7 +219,7 @@ func TestBroadcastencodeForSigningError(t *testing.T) {
 	m := make([]byte, 32)
 	a := make([]byte, 8)
 	tagBytes := make([]byte, 32)
-	tag, err := wire.NewShaHash(tagBytes)
+	tag, err := hash.NewSha(tagBytes)
 	if err != nil {
 		t.Fatalf("could not make a sha hash %s", err)
 	}

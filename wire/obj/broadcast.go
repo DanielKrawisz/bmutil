@@ -13,6 +13,7 @@ import (
 	"io/ioutil"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 )
@@ -146,7 +147,7 @@ func (msg *TaglessBroadcast) Encrypted() []byte {
 // all the clients that know the address of the sender.
 type TaggedBroadcast struct {
 	header    *wire.ObjectHeader
-	Tag       *wire.ShaHash
+	Tag       *hash.Sha
 	encrypted []byte
 }
 
@@ -170,7 +171,7 @@ func (msg *TaggedBroadcast) EncodeForSigning(w io.Writer) error {
 // This is part of the Message interface implementation.
 func (msg *TaggedBroadcast) decodePayload(r io.Reader) error {
 	var err error
-	msg.Tag = &wire.ShaHash{}
+	msg.Tag = &hash.Sha{}
 
 	err = wire.ReadElements(r, msg.Tag)
 	if err != nil {
@@ -288,7 +289,7 @@ func NewTaglessBroadcast(nonce pow.Nonce, expiration time.Time, streamNumber uin
 // Object interface using the passed parameters and defaults for the remaining
 // fields.
 func NewTaggedBroadcast(nonce pow.Nonce, expiration time.Time, streamNumber uint64,
-	tag *wire.ShaHash, encrypted []byte) *TaggedBroadcast {
+	tag *hash.Sha, encrypted []byte) *TaggedBroadcast {
 	return &TaggedBroadcast{
 		header: wire.NewObjectHeader(
 			nonce,

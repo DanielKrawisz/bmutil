@@ -6,51 +6,49 @@
 // Use of this source code is governed by an ISC
 // license that can be found in the LICENSE file.
 
-package wire
+package hash
 
 import (
 	"bytes"
 	"encoding/hex"
 	"fmt"
-
-	"github.com/DanielKrawisz/bmutil"
 )
 
-// HashSize is the size of the array used to store SHA hashes.
-const HashSize = 32
+// ShaSize is the size of the array used to store SHA hashes.
+const ShaSize = 32
 
 // HashStringSize is the maximum length of a ShaHash hash string.
-const HashStringSize = HashSize * 2
+const HashStringSize = ShaSize * 2
 
 // ErrHashStrSize describes an error that indicates the caller specified a hash
 // string that does not have the right number of characters.
 var ErrHashStrSize = fmt.Errorf("string length must be %v chars", HashStringSize)
 
-// ShaHash is used in several of the bitmessage messages and common structures.
+// Sha is used in several of the bitmessage messages and common structures.
 // It typically represents a half of the double SHA512 of data.
-type ShaHash [HashSize]byte
+type Sha [ShaSize]byte
 
 // String returns the ShaHash as the hexadecimal string of the byte-reversed
 // hash.
-func (hash ShaHash) String() string {
+func (hash Sha) String() string {
 	return hex.EncodeToString(hash[:])
 }
 
 // Bytes returns the bytes which represent the hash as a byte slice.
-func (hash *ShaHash) Bytes() []byte {
-	newHash := make([]byte, HashSize)
+func (hash *Sha) Bytes() []byte {
+	newHash := make([]byte, ShaSize)
 	copy(newHash, hash[:])
 
 	return newHash
 }
 
 // SetBytes sets the bytes which represent the hash. An error is returned if
-// the number of bytes passed in is not HashSize.
-func (hash *ShaHash) SetBytes(newHash []byte) error {
+// the number of bytes passed in is not ShaSize.
+func (hash *Sha) SetBytes(newHash []byte) error {
 	nhlen := len(newHash)
-	if nhlen != HashSize {
+	if nhlen != ShaSize {
 		return fmt.Errorf("invalid sha length of %v, want %v", nhlen,
-			HashSize)
+			ShaSize)
 	}
 	copy(hash[:], newHash)
 
@@ -58,17 +56,17 @@ func (hash *ShaHash) SetBytes(newHash []byte) error {
 }
 
 // IsEqual returns true if target is the same as hash.
-func (hash *ShaHash) IsEqual(target *ShaHash) bool {
+func (hash *Sha) IsEqual(target *Sha) bool {
 	if target == nil {
 		return false
 	}
 	return bytes.Equal(hash[:], target[:])
 }
 
-// NewShaHash returns a new ShaHash from a byte slice. An error is returned if
-// the number of bytes passed in is not HashSize.
-func NewShaHash(newHash []byte) (*ShaHash, error) {
-	var sh ShaHash
+// NewSha returns a new ShaHash from a byte slice. An error is returned if
+// the number of bytes passed in is not ShaHash.
+func NewSha(newHash []byte) (*Sha, error) {
+	var sh Sha
 	err := sh.SetBytes(newHash)
 	if err != nil {
 		return nil, err
@@ -76,9 +74,9 @@ func NewShaHash(newHash []byte) (*ShaHash, error) {
 	return &sh, err
 }
 
-// NewShaHashFromStr creates a ShaHash from a hash string. The string should be
+// NewShaFromStr creates a ShaHash from a hash string. The string should be
 // the hexadecimal string of a hash.
-func NewShaHashFromStr(hash string) (*ShaHash, error) {
+func NewShaFromStr(hash string) (*Sha, error) {
 	// Return error if hash string is not the right size.
 	if len(hash) != HashStringSize {
 		return nil, ErrHashStrSize
@@ -90,12 +88,12 @@ func NewShaHashFromStr(hash string) (*ShaHash, error) {
 		return nil, err
 	}
 
-	return NewShaHash(buf)
+	return NewSha(buf)
 }
 
 // InventoryHash takes double sha512 of the bytes and returns the first half.
 // It calculates inventory hash of the object as required by the protocol.
-func InventoryHash(stuff []byte) *ShaHash {
-	hash, _ := NewShaHash(bmutil.DoubleSha512(stuff)[:32])
+func InventoryHash(stuff []byte) *Sha {
+	hash, _ := NewSha(DoubleSha512(stuff)[:32])
 	return hash
 }

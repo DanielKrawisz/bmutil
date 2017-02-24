@@ -25,10 +25,10 @@ type ObjectType uint32
 //  - Broadcast: broadcast messages.
 // An ObjectType can also take on other values representing unknown message types.
 const (
-	ObjectTypeGetPubKey ObjectType = 0
-	ObjectTypePubKey    ObjectType = 1
-	ObjectTypeMsg       ObjectType = 2
-	ObjectTypeBroadcast ObjectType = 3
+	ObjectTypeGetPubKey    ObjectType = 0
+	ObjectTypePubKey       ObjectType = 1
+	ObjectTypeMsg          ObjectType = 2
+	ObjectTypeBroadcast    ObjectType = 3
 	HighestKnownObjectType ObjectType = ObjectTypeBroadcast
 )
 

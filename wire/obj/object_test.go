@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/obj"
@@ -51,7 +52,7 @@ func TestObject(t *testing.T) {
 	// ripe-based getpubkey message
 	ripeBytes := make([]byte, 20)
 	ripeBytes[0] = 1
-	ripe, err := wire.NewRipeHash(ripeBytes)
+	ripe, err := hash.NewRipe(ripeBytes)
 	if err != nil {
 		t.Fatalf("could not make a ripe hash %s", err)
 	}
@@ -68,7 +69,7 @@ func TestObject(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not create a pubkey %s", err)
 	}
-	var tag wire.ShaHash
+	var tag hash.Sha
 	msgSimplePubKey := obj.NewSimplePubKey(123123, expires, 1, &obj.PubKeyData{0, pub1, pub2, nil})
 	msgExtendedPubKey := obj.NewExtendedPubKey(123123, expires, 1,
 		&obj.PubKeyData{
