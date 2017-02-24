@@ -35,16 +35,16 @@ var (
 // GeneratePubKey generates a PubKey from the specified private
 // identity. It also signs and encrypts it (if necessary) yielding an object
 // that only needs proof-of-work to be done on it.
-func GeneratePubKey(privID *identity.Private, expiry time.Duration) (PubKey, error) {
+func GeneratePubKey(privID *identity.PrivateID, expiry time.Duration) (PubKey, error) {
 	addr := privID.Address()
 
 	switch addr.Version() {
 	case obj.SimplePubKeyVersion:
-		return createSimplePubKey(time.Now().Add(expiry), addr.Stream(), privID.Behavior, privID), nil
+		return createSimplePubKey(time.Now().Add(expiry), addr.Stream(), privID.Behavior(), privID), nil
 	case obj.ExtendedPubKeyVersion:
-		return createExtendedPubKey(time.Now().Add(expiry), addr.Stream(), privID.Behavior, privID)
+		return createExtendedPubKey(time.Now().Add(expiry), addr.Stream(), privID.Behavior(), privID)
 	case obj.EncryptedPubKeyVersion:
-		return createDecryptedPubKey(time.Now().Add(expiry), addr.Stream(), privID.Behavior, privID)
+		return createDecryptedPubKey(time.Now().Add(expiry), addr.Stream(), privID.Behavior(), privID)
 	default:
 		return nil, ErrUnsupportedOp
 	}
@@ -105,10 +105,10 @@ func TryDecryptAndVerifyPubKey(msg obj.Object, address bmutil.Address) (PubKey, 
 // The private identity supplied should be of the sender. There are no checks
 // against supplying invalid private identity.
 func SignAndEncryptBroadcast(expiration time.Time,
-	msg *Bitmessage, tag *hash.Sha, privID *identity.Private) (*Broadcast, error) {
+	msg *Bitmessage, tag *hash.Sha, privID *identity.PrivateID) (*Broadcast, error) {
 
 	if tag == nil {
-		if msg.FromAddressVersion != 2 && msg.FromAddressVersion != 3 {
+		if msg.Version != 2 && msg.Version != 3 {
 			// only v2/v3 addresses allowed for tagless broadcast
 			return nil, ErrUnsupportedOp
 		}
@@ -116,7 +116,7 @@ func SignAndEncryptBroadcast(expiration time.Time,
 		return CreateTaglessBroadcast(expiration, msg, privID)
 	}
 
-	if msg.FromAddressVersion != 4 {
+	if msg.Version != 4 {
 		// only v4 addresses support tags
 		return nil, ErrUnsupportedOp
 	}
@@ -151,17 +151,18 @@ func TryDecryptAndVerifyBroadcast(msg obj.Broadcast, address bmutil.Address) (*B
 // should be that of the recipient. There are no checks against supplying
 // invalid private or public identities.
 func SignAndEncryptMessage(expiration time.Time, streamNumber uint64,
-	data *Bitmessage, ack []byte, privID *identity.Private, pubID *identity.Public) (*Message, error) {
+	bm *Bitmessage, ack []byte, privID *identity.PrivateKey,
+	pubID *identity.PublicKey) (*Message, error) {
 
-	if data.Destination == nil {
+	if bm.Destination == nil {
 		return nil, errors.New("No destination given.")
 	}
 
 	tmpMsg := obj.NewMessage(0, expiration, streamNumber, nil)
 	message := Message{
-		msg:  tmpMsg,
-		data: data,
-		ack:  ack,
+		msg: tmpMsg,
+		bm:  bm,
+		ack: ack,
 	}
 
 	// Start signing
@@ -176,11 +177,11 @@ func SignAndEncryptMessage(expiration time.Time, streamNumber uint64,
 	b.Reset()
 
 	// Sign
-	sig, err := privID.SigningKey.Sign(hash[:])
+	sig, err := privID.Signing.Sign(hash[:])
 	if err != nil {
 		return nil, fmt.Errorf("signing failed: %v", err)
 	}
-	message.signature = sig.Serialize()
+	message.sig = sig.Serialize()
 
 	// Start encryption
 	err = message.encodeForEncryption(&b)
@@ -189,7 +190,7 @@ func SignAndEncryptMessage(expiration time.Time, streamNumber uint64,
 	}
 
 	// Encrypt
-	encrypted, err := btcec.Encrypt(pubID.EncryptionKey, b.Bytes())
+	encrypted, err := btcec.Encrypt(pubID.Encryption, b.Bytes())
 	if err != nil {
 		return nil, fmt.Errorf("encryption failed: %v", err)
 	}
@@ -205,7 +206,7 @@ func SignAndEncryptMessage(expiration time.Time, streamNumber uint64,
 // returns ErrInvalidSignature. Else, it returns nil.
 //
 // All necessary fields of the provided obj.Message are populated.
-func TryDecryptAndVerifyMessage(msg *obj.Message, privID *identity.Private) (*Message, error) {
+func TryDecryptAndVerifyMessage(msg *obj.Message, privID *identity.PrivateID) (*Message, error) {
 	if msg.Header().Version != obj.MessageVersion {
 		println("Wrong message version: ", msg.Header().Version)
 		return nil, ErrUnsupportedOp

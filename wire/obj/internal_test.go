@@ -164,9 +164,9 @@ func TstBasePubKey(pub1, pub2 *wire.PubKey) *SimplePubKey {
 			2,
 			1),
 		Data: &PubKeyData{
-			Behavior:        0,
-			VerificationKey: pub1,
-			EncryptionKey:   pub2,
+			Behavior:     0,
+			Verification: pub1,
+			Encryption:   pub2,
 		},
 	}
 }
@@ -180,9 +180,9 @@ func TstExpandedPubKey(pub1, pub2 *wire.PubKey) *ExtendedPubKey {
 			3,
 			1),
 		Data: &PubKeyData{
-			Behavior:        0,
-			VerificationKey: pub1,
-			EncryptionKey:   pub2,
+			Behavior:     0,
+			Verification: pub1,
+			Encryption:   pub2,
 			Pow: &pow.Data{
 				NonceTrialsPerByte: 0,
 				ExtraBytes:         0,

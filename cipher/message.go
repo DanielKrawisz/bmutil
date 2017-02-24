@@ -28,10 +28,10 @@ const (
 // Message is a representation of a message object that includes
 // data which would normally be encrypted.
 type Message struct {
-	msg       *obj.Message
-	data      *Bitmessage
-	ack       []byte
-	signature []byte
+	msg *obj.Message
+	bm  *Bitmessage
+	ack []byte
+	sig []byte
 }
 
 // Object returns the object form of the message that can be sent over
@@ -42,7 +42,7 @@ func (msg *Message) Object() *obj.Message {
 
 // Bitmessage returns the message data.
 func (msg *Message) Bitmessage() *Bitmessage {
-	return msg.data
+	return msg.bm
 }
 
 // Ack returns the acknowledgement message.
@@ -57,7 +57,7 @@ func (msg *Message) encodeForSigning(w io.Writer) error {
 		return err
 	}
 
-	if err = msg.data.encodeMessage(w); err != nil {
+	if err = msg.bm.encodeMessage(w); err != nil {
 		return err
 	}
 
@@ -73,7 +73,7 @@ func (msg *Message) encodeForSigning(w io.Writer) error {
 
 // encodeForEncryption encodes Message so that it can be encrypted.
 func (msg *Message) encodeForEncryption(w io.Writer) error {
-	err := msg.data.encodeMessage(w)
+	err := msg.bm.encodeMessage(w)
 	if err != nil {
 		return err
 	}
@@ -86,11 +86,11 @@ func (msg *Message) encodeForEncryption(w io.Writer) error {
 		return err
 	}
 
-	sigLength := uint64(len(msg.signature))
+	sigLength := uint64(len(msg.sig))
 	if err = bmutil.WriteVarInt(w, sigLength); err != nil {
 		return err
 	}
-	if _, err = w.Write(msg.signature); err != nil {
+	if _, err = w.Write(msg.sig); err != nil {
 		return err
 	}
 	return nil
@@ -98,8 +98,8 @@ func (msg *Message) encodeForEncryption(w io.Writer) error {
 
 // decodeFromDecrypted decodes Message from its decrypted form.
 func (msg *Message) decodeFromDecrypted(r io.Reader) error {
-	msg.data = &Bitmessage{}
-	err := msg.data.decodeMessage(r)
+	msg.bm = &Bitmessage{}
+	err := msg.bm.decodeMessage(r)
 	if err != nil {
 		return err
 	}
@@ -130,17 +130,17 @@ func (msg *Message) decodeFromDecrypted(r io.Reader) error {
 			sigLength, obj.SignatureMaxLength)
 		return wire.NewMessageError("decodeFromDecrypted", str)
 	}
-	msg.signature = make([]byte, sigLength)
-	_, err = io.ReadFull(r, msg.signature)
+	msg.sig = make([]byte, sigLength)
+	_, err = io.ReadFull(r, msg.sig)
 	return err
 }
 
-func (msg Message) verify(private *identity.Private) error {
+func (msg Message) verify(private *identity.PrivateID) error {
 	// Check if embedded destination ripe corresponds to private identity.
 	if subtle.ConstantTimeCompare(private.Address().RipeHash()[:],
-		msg.data.Destination.Bytes()) != 1 {
+		msg.bm.Destination.Bytes()) != 1 {
 		return fmt.Errorf("Decryption succeeded but ripes don't match. Got %s"+
-			" expected %s", msg.data.Destination,
+			" expected %s", msg.bm.Destination,
 			hex.EncodeToString(private.Address().RipeHash()[:]))
 	}
 
@@ -156,12 +156,12 @@ func (msg Message) verify(private *identity.Private) error {
 	sha1hash := sha1.Sum(b.Bytes())
 
 	// Verify
-	pubSigningKey, err := msg.data.SigningKey.ToBtcec()
+	pubSigningKey, err := msg.bm.Data.Verification.ToBtcec()
 	if err != nil {
 		return err
 	}
 
-	sig, err := btcec.ParseSignature(msg.signature, btcec.S256())
+	sig, err := btcec.ParseSignature(msg.sig, btcec.S256())
 	if err != nil {
 		return ErrInvalidSignature
 	}
@@ -177,8 +177,8 @@ func (msg Message) verify(private *identity.Private) error {
 
 // NewMessage attempts to decrypt the data in a message object and turn it
 // into a Message.
-func NewMessage(msg *obj.Message, private *identity.Private) (*Message, error) {
-	dec, err := btcec.Decrypt(private.DecryptionKey, msg.Encrypted)
+func NewMessage(msg *obj.Message, private *identity.PrivateID) (*Message, error) {
+	dec, err := btcec.Decrypt(private.PrivateKey().Decryption, msg.Encrypted)
 
 	if err == btcec.ErrInvalidMAC { // decryption failed due to invalid key
 		return nil, ErrInvalidIdentity

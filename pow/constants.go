@@ -18,8 +18,8 @@ const (
 	DefaultExtraBytes = 1000
 )
 
-// DefaultData puts the default values together in one Data struct.
-var DefaultData = Data{
+// Default puts the default values together in one Data struct.
+var Default = Data{
 	NonceTrialsPerByte: DefaultNonceTrialsPerByte,
 	ExtraBytes:         DefaultExtraBytes,
 }

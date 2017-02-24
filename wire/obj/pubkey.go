@@ -39,67 +39,6 @@ const (
 	SignatureMaxLength = 80
 )
 
-// PubKeyData contains the information that is transmitted in a PubKey object.
-type PubKeyData struct {
-	Behavior        uint32
-	VerificationKey *wire.PubKey
-	EncryptionKey   *wire.PubKey
-	Pow             *pow.Data
-}
-
-// EncodeSimple encodes the PubKeyData to a writer according to the format
-// for a SimplePubKey.
-func (pk *PubKeyData) EncodeSimple(w io.Writer) error {
-	return wire.WriteElements(w, pk.Behavior, pk.VerificationKey, pk.EncryptionKey)
-}
-
-// Encode encodes the PubKeyData to a writer.
-func (pk *PubKeyData) Encode(w io.Writer) error {
-	if err := pk.EncodeSimple(w); err != nil {
-		return err
-	}
-
-	if pk.Pow != nil {
-		err := pk.Pow.Encode(w)
-		if err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
-// DecodeSimple decodes a PubKeyData according to the simpler, original
-// format for PubKey objects.
-func (pk *PubKeyData) DecodeSimple(r io.Reader) error {
-	pk.VerificationKey = &wire.PubKey{}
-	pk.EncryptionKey = &wire.PubKey{}
-	return wire.ReadElements(r, &pk.Behavior, pk.VerificationKey, pk.EncryptionKey)
-}
-
-// Decode decodes a PubKeyData from a reader.
-func (pk *PubKeyData) Decode(r io.Reader) error {
-	err := pk.DecodeSimple(r)
-	if err != nil {
-		return err
-	}
-
-	pk.Pow = &pow.Data{}
-	return pk.Pow.Decode(r)
-}
-
-// String creates a human-readible string of a PubKeyData.
-func (pk *PubKeyData) String() string {
-	str := fmt.Sprintf("{Behavior: %d, VerificationKey: %s, EncryptionKey: %s",
-		pk.Behavior, pk.VerificationKey.String(), pk.EncryptionKey.String())
-
-	if pk.Pow != nil {
-		str += ", " + pk.Pow.String()
-	}
-
-	return str + "}"
-}
-
 // EncodePubKeySignature encodes a PubKey signature.
 func EncodePubKeySignature(w io.Writer, signature []byte) (err error) {
 	sigLength := uint64(len(signature))
@@ -149,9 +88,9 @@ func NewSimplePubKey(nonce pow.Nonce, expiration time.Time,
 			streamNumber,
 		),
 		Data: &PubKeyData{
-			Behavior:        data.Behavior,
-			VerificationKey: data.VerificationKey,
-			EncryptionKey:   data.EncryptionKey,
+			Behavior:     data.Behavior,
+			Verification: data.Verification,
+			Encryption:   data.Encryption,
 		},
 	}
 }
@@ -238,12 +177,12 @@ func (p *SimplePubKey) Behavior() uint32 {
 
 // VerificationKey return's the PubKey's VerificationKey
 func (p *SimplePubKey) VerificationKey() *wire.PubKey {
-	return p.Data.VerificationKey
+	return p.Data.Verification
 }
 
 // EncryptionKey return's the PubKey's EncryptionKey
 func (p *SimplePubKey) EncryptionKey() *wire.PubKey {
-	return p.Data.EncryptionKey
+	return p.Data.Encryption
 }
 
 // Pow return's the key's pow data. For the SimplePubKey, this is nil.
@@ -379,12 +318,12 @@ func (p *ExtendedPubKey) Behavior() uint32 {
 
 // VerificationKey return's the PubKey's VerificationKey
 func (p *ExtendedPubKey) VerificationKey() *wire.PubKey {
-	return p.Data.VerificationKey
+	return p.Data.Verification
 }
 
 // EncryptionKey return's the PubKey's EncryptionKey
 func (p *ExtendedPubKey) EncryptionKey() *wire.PubKey {
-	return p.Data.EncryptionKey
+	return p.Data.Encryption
 }
 
 // Pow return's the key's pow data. For the SimplePubKey, this is nil.

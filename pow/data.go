@@ -5,8 +5,8 @@
 package pow
 
 import (
-	"io"
 	"fmt"
+	"io"
 
 	"github.com/DanielKrawisz/bmutil"
 )

@@ -73,9 +73,9 @@ func TestObject(t *testing.T) {
 	msgSimplePubKey := obj.NewSimplePubKey(123123, expires, 1, &obj.PubKeyData{0, pub1, pub2, nil})
 	msgExtendedPubKey := obj.NewExtendedPubKey(123123, expires, 1,
 		&obj.PubKeyData{
-			Behavior:        0,
-			VerificationKey: pub1,
-			EncryptionKey:   pub2,
+			Behavior:     0,
+			Verification: pub1,
+			Encryption:   pub2,
 			Pow: &pow.Data{
 				NonceTrialsPerByte: 4,
 				ExtraBytes:         5,

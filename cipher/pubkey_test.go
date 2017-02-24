@@ -309,14 +309,14 @@ func TestSignAndEncryptPubKey(t *testing.T) {
 	pubkey1 := tstNewDecryptedPubKey(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 		1, 0, SignKey1, EncKey1, 1000, 1000, nil, Tag1, nil)
 
-	err := pubkey1.signAndEncrypt(PrivID1)
+	err := pubkey1.signAndEncrypt(PrivID1())
 	if err != nil {
 		t.Errorf("for SignAndEncryptPubKey got error %v", err)
 	}
 
 	pubkey2 := tstNewExtendedPubKey(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 		1, 0, SignKey2, EncKey2, 1000, 1000, nil)
-	err = signExtendedPubKey(pubkey2, PrivID2)
+	err = signExtendedPubKey(pubkey2, PrivKey2())
 	if err != nil {
 		t.Errorf("for SignAndEncryptPubKey got error %v", err)
 	}

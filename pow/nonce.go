@@ -30,7 +30,7 @@ func (n Nonce) Encode(w io.Writer) error {
 	return nil
 }
 
-// Decode decodes a nonce from a reader.
+// DecodeNonce decodes a nonce from a reader.
 func DecodeNonce(r io.Reader) (Nonce, error) {
 	var b [8]byte
 	_, err := io.ReadFull(r, b[:])

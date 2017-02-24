@@ -27,15 +27,15 @@ func TestPubKey(t *testing.T) {
 	tests := []wire.Message{
 		obj.NewSimplePubKey(83928, now, 1,
 			&obj.PubKeyData{
-				Behavior:        0,
-				VerificationKey: pubKey1,
-				EncryptionKey:   pubKey2,
+				Behavior:     0,
+				Verification: pubKey1,
+				Encryption:   pubKey2,
 			}),
 		obj.NewExtendedPubKey(83928, now, 1,
 			&obj.PubKeyData{
-				Behavior:        0,
-				VerificationKey: pubKey1,
-				EncryptionKey:   pubKey2,
+				Behavior:     0,
+				Verification: pubKey1,
+				Encryption:   pubKey2,
 				Pow: &pow.Data{
 					NonceTrialsPerByte: 0,
 					ExtraBytes:         0,
@@ -74,9 +74,9 @@ func TestPubKeyWire(t *testing.T) {
 		&obj.PubKeyData{0, pubKey1, pubKey2, nil})
 	msgExpanded := obj.NewExtendedPubKey(83928, expires, 1,
 		&obj.PubKeyData{
-			Behavior:        0,
-			VerificationKey: pubKey1,
-			EncryptionKey:   pubKey2,
+			Behavior:     0,
+			Verification: pubKey1,
+			Encryption:   pubKey2,
 			Pow: &pow.Data{
 				NonceTrialsPerByte: 0,
 				ExtraBytes:         0,

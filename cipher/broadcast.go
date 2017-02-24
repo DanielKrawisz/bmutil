@@ -106,9 +106,9 @@ func broadcastEncodeForSigning(w io.Writer, i incompleteBroadcast, data *Bitmess
 // Broadcast represents a broadcast that has either been decrypted from the
 // network or which we have created.
 type Broadcast struct {
-	msg       obj.Broadcast
-	data      *Bitmessage
-	signature []byte
+	msg obj.Broadcast
+	bm  *Bitmessage
+	sig []byte
 }
 
 // Object returns the object form of the message.
@@ -118,7 +118,7 @@ func (broadcast *Broadcast) Object() obj.Broadcast {
 
 // Bitmessage returns the message data.
 func (broadcast *Broadcast) Bitmessage() *Bitmessage {
-	return broadcast.data
+	return broadcast.bm
 }
 
 // encodeForSigning encodes Broadcast so that it can be hashed and signed.
@@ -131,7 +131,7 @@ func (broadcast *Broadcast) encodeForSigning(w io.Writer) error {
 		return err
 	}
 
-	if err = broadcast.data.encodeBroadcast(w); err != nil {
+	if err = broadcast.bm.encodeBroadcast(w); err != nil {
 		return err
 	}
 
@@ -140,16 +140,16 @@ func (broadcast *Broadcast) encodeForSigning(w io.Writer) error {
 
 // encodeForEncryption encodes Broadcast so that it can be encrypted.
 func (broadcast *Broadcast) encodeForEncryption(w io.Writer) error {
-	err := broadcast.data.encodeBroadcast(w)
+	err := broadcast.bm.encodeBroadcast(w)
 	if err != nil {
 		return err
 	}
 
-	sigLength := uint64(len(broadcast.signature))
+	sigLength := uint64(len(broadcast.sig))
 	if err = bmutil.WriteVarInt(w, sigLength); err != nil {
 		return err
 	}
-	if _, err = w.Write(broadcast.signature); err != nil {
+	if _, err = w.Write(broadcast.sig); err != nil {
 		return err
 	}
 	return nil
@@ -157,8 +157,8 @@ func (broadcast *Broadcast) encodeForEncryption(w io.Writer) error {
 
 // decodeFromDecrypted decodes Broadcast from its decrypted form.
 func (broadcast *Broadcast) decodeFromDecrypted(r io.Reader) error {
-	broadcast.data = &Bitmessage{}
-	err := broadcast.data.decodeBroadcast(r)
+	broadcast.bm = &Bitmessage{}
+	err := broadcast.bm.decodeBroadcast(r)
 	if err != nil {
 		return err
 	}
@@ -173,19 +173,19 @@ func (broadcast *Broadcast) decodeFromDecrypted(r io.Reader) error {
 			sigLength, obj.SignatureMaxLength)
 		return wire.NewMessageError("DecodeFromDecrypted", str)
 	}
-	broadcast.signature = make([]byte, sigLength)
-	_, err = io.ReadFull(r, broadcast.signature)
+	broadcast.sig = make([]byte, sigLength)
+	_, err = io.ReadFull(r, broadcast.sig)
 	return err
 }
 
 func (broadcast *Broadcast) signAndEncrypt(
 	i incompleteBroadcast,
 	address bmutil.Address,
-	private *identity.Private) error {
+	private *identity.PrivateKey) error {
 
 	// Start signing
 	var b bytes.Buffer
-	err := broadcastEncodeForSigning(&b, i, broadcast.data)
+	err := broadcastEncodeForSigning(&b, i, broadcast.bm)
 	if err != nil {
 		return err
 	}
@@ -195,11 +195,11 @@ func (broadcast *Broadcast) signAndEncrypt(
 	b.Reset()
 
 	// Sign
-	sig, err := private.SigningKey.Sign(hash[:])
+	sig, err := private.Signing.Sign(hash[:])
 	if err != nil {
 		return fmt.Errorf("signing failed: %v", err)
 	}
-	broadcast.signature = sig.Serialize()
+	broadcast.sig = sig.Serialize()
 
 	// Start encryption
 	err = broadcast.encodeForEncryption(&b)
@@ -224,19 +224,16 @@ func (broadcast Broadcast) verify(address bmutil.Address) error {
 	}
 
 	// Check if embedded keys correspond to the address used to decrypt.
-	signKey, err := broadcast.data.SigningKey.ToBtcec()
+	public, err := broadcast.bm.ToPublicKey()
 	if err != nil {
 		return err
 	}
-	encKey, err := broadcast.data.EncryptionKey.ToBtcec()
-	if err != nil {
-		return err
-	}
-	id, err := identity.NewPublic(
-		signKey, encKey,
-		broadcast.data.Behavior,
-		broadcast.data.Pow,
-		address.Version(), address.Stream())
+
+	id, err := identity.NewPublicID(
+		public,
+		address.Version(), address.Stream(),
+		broadcast.bm.Data.Behavior,
+		broadcast.bm.Data.Pow)
 	if err != nil {
 		return err
 	}
@@ -263,13 +260,13 @@ func (broadcast Broadcast) verify(address bmutil.Address) error {
 	sha1hash := sha1.Sum(b.Bytes()) // backwards compatibility
 
 	// Verify
-	sig, err := btcec.ParseSignature(broadcast.signature, btcec.S256())
+	sig, err := btcec.ParseSignature(broadcast.sig, btcec.S256())
 	if err != nil {
 		return ErrInvalidSignature
 	}
 
-	if !sig.Verify(hash[:], signKey) { // Try SHA256 first
-		if !sig.Verify(sha1hash[:], signKey) { // then SHA1
+	if !sig.Verify(hash[:], public.Verification) { // Try SHA256 first
+		if !sig.Verify(sha1hash[:], public.Verification) { // then SHA1
 			return ErrInvalidSignature
 		}
 	}
@@ -278,20 +275,22 @@ func (broadcast Broadcast) verify(address bmutil.Address) error {
 
 // CreateTaglessBroadcast creates a Broadcast that we send over the network,
 // as opposed to one that we receive and decrypt.
-func CreateTaglessBroadcast(expiration time.Time, data *Bitmessage,
-	private *identity.Private) (*Broadcast, error) {
+func CreateTaglessBroadcast(expiration time.Time, bm *Bitmessage,
+	private *identity.PrivateID) (*Broadcast, error) {
 
 	address := private.Address()
 
-	if data.Destination != nil {
+	if bm.Destination != nil {
 		return nil, errors.New("Broadcasts do not have a destination.")
 	}
 
 	broadcast := Broadcast{
-		data: data,
+		bm: bm,
 	}
 
-	err := broadcast.signAndEncrypt(&incompleteTaglessBroadcast{expiration, address.Stream()}, address, private)
+	err := broadcast.signAndEncrypt(
+		&incompleteTaglessBroadcast{expiration, address.Stream()},
+		address, private.PrivateKey())
 	if err != nil {
 		return nil, err
 	}
@@ -301,20 +300,22 @@ func CreateTaglessBroadcast(expiration time.Time, data *Bitmessage,
 
 // CreateTaggedBroadcast creates a Broadcast that we send over the network,
 // as opposed to one that we receive and decrypt.
-func CreateTaggedBroadcast(expires time.Time, data *Bitmessage, tag *hash.Sha,
-	private *identity.Private) (*Broadcast, error) {
+func CreateTaggedBroadcast(expires time.Time, bm *Bitmessage, tag *hash.Sha,
+	private *identity.PrivateID) (*Broadcast, error) {
 
 	address := private.Address()
 
-	if data.Destination != nil {
+	if bm.Destination != nil {
 		return nil, errors.New("Broadcasts do not have a destination.")
 	}
 
 	broadcast := Broadcast{
-		data: data,
+		bm: bm,
 	}
 
-	err := broadcast.signAndEncrypt(&incompleteTaggedBroadcast{expires, address.Stream(), tag}, address, private)
+	err := broadcast.signAndEncrypt(
+		&incompleteTaggedBroadcast{expires, address.Stream(), tag},
+		address, private.PrivateKey())
 	if err != nil {
 		return nil, err
 	}

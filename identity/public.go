@@ -6,77 +6,62 @@
 package identity
 
 import (
-	"math"
+	"crypto/sha512"
 
-	"github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/hash"
-	"github.com/DanielKrawisz/bmutil/pow"
+	"github.com/DanielKrawisz/bmutil/wire/obj"
 	"github.com/btcsuite/btcd/btcec"
+	"golang.org/x/crypto/ripemd160"
 )
 
-// Public contains the identity of the remote user, which includes public
-// encryption and signing keys, POW parameters and the address that contains
-// information about stream number and address version.
-type Public struct {
-	address bmutil.Address
-	pow.Data
-	VerificationKey *btcec.PublicKey
-	EncryptionKey   *btcec.PublicKey
-	Behavior        uint32
+// PublicKey contains the identity of the remote user, which includes public
+// encryption and signing keys, and POW parameters.
+type PublicKey struct {
+	Verification *btcec.PublicKey
+	Encryption   *btcec.PublicKey
 }
 
-// createAddress populates the Address object within the identity based on the
-// provided version and stream values and also generates the ripe.
-func createAddress(version, stream uint64, ripe []byte) (bmutil.Address, error) {
-	r, err := hash.NewRipe(ripe)
+// hashHelper exists for delegating the task of hash calculation
+func hashHelper(signingKey []byte, decryptionKey []byte) []byte {
+	sha := sha512.New()
+	ripemd := ripemd160.New()
+
+	sha.Write(signingKey)
+	sha.Write(decryptionKey)
+
+	ripemd.Write(sha.Sum(nil)) // take ripemd160 of required elements
+	return ripemd.Sum(nil)     // Get the hash
+}
+
+// Hash returns the ripemd160 hash used in the address
+func (id *PublicKey) Hash() *hash.Ripe {
+	r, _ := hash.NewRipe(hashHelper(id.Verification.SerializeUncompressed(),
+		id.Encryption.SerializeUncompressed()))
+	return r
+}
+
+// NewPublicKey creates and initializes an *identity.Public object.
+func NewPublicKey(verificationKey, encryptionKey *btcec.PublicKey) *PublicKey {
+	return &PublicKey{
+		Encryption:   encryptionKey,
+		Verification: verificationKey,
+	}
+}
+
+// ToPublic constructs the PublicKey object.
+func ToPublic(pk *obj.PubKeyData) (*PublicKey, error) {
+	// Check if embedded keys correspond to the address used to decrypt.
+	vk, err := pk.Verification.ToBtcec()
+	if err != nil {
+		return nil, err
+	}
+	ek, err := pk.Encryption.ToBtcec()
 	if err != nil {
 		return nil, err
 	}
 
-	if version < 4 {
-		return bmutil.NewDepricatedAddress(version, stream, r)
-	}
-
-	return bmutil.NewAddress(version, stream, r)
-}
-
-// hash returns the ripemd160 hash used in the address
-func (id *Public) hash() []byte {
-	return hashHelper(id.VerificationKey.SerializeUncompressed(),
-		id.EncryptionKey.SerializeUncompressed())
-}
-
-// Address returns the address of the id.
-func (id *Public) Address() bmutil.Address {
-	return id.address
-}
-
-// NewPublic creates and initializes an *identity.Public object.
-func NewPublic(verificationKey, encryptionKey *btcec.PublicKey, behavior uint32,
-	data *pow.Data, addrVersion, addrStream uint64) (*Public, error) {
-
-	id := &Public{
-		EncryptionKey:   encryptionKey,
-		VerificationKey: verificationKey,
-	}
-	// set values appropriately; note that Go zero-initializes everything
-	// so if version is 2, we should have 0 in msg.ExtraBytes and
-	// msg.NonceTrials
-	if data == nil {
-		id.NonceTrialsPerByte = pow.DefaultNonceTrialsPerByte
-		id.ExtraBytes = pow.DefaultExtraBytes
-	} else {
-		id.NonceTrialsPerByte = uint64(math.Max(float64(pow.DefaultNonceTrialsPerByte),
-			float64(data.NonceTrialsPerByte)))
-		id.ExtraBytes = uint64(math.Max(float64(pow.DefaultExtraBytes),
-			float64(data.ExtraBytes)))
-	}
-
-	var err error
-	id.address, err = createAddress(addrVersion, addrStream, id.hash())
-	if err != nil {
-		return nil, err
-	}
-
-	return id, nil
+	return &PublicKey{
+		Verification: vk,
+		Encryption:   ek,
+	}, nil
 }

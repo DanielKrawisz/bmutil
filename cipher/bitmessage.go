@@ -7,96 +7,127 @@ package cipher
 import (
 	"io"
 
-	"github.com/DanielKrawisz/bmutil"
+	. "github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/format"
 	"github.com/DanielKrawisz/bmutil/hash"
-	"github.com/DanielKrawisz/bmutil/pow"
+	"github.com/DanielKrawisz/bmutil/identity"
 	"github.com/DanielKrawisz/bmutil/wire"
+	"github.com/DanielKrawisz/bmutil/wire/obj"
 )
 
 // Bitmessage is a representation of the data included in a bitmessage.
 // It could be part of a message object or a broadcast object.
 type Bitmessage struct {
-	FromAddressVersion uint64
-	FromStreamNumber   uint64
-	Behavior           uint32
-	SigningKey         *wire.PubKey
-	EncryptionKey      *wire.PubKey
-	Pow                *pow.Data
-	Destination        *hash.Ripe
-	Content            format.Encoding
+	Version     uint64
+	Stream      uint64
+	Data        *obj.PubKeyData
+	Destination *hash.Ripe
+	Content     format.Encoding
+}
+
+// ToPublicKey constructs the PublicKey object from this Bitmessage.
+func (b *Bitmessage) ToPublicKey() (*identity.PublicKey, error) {
+	// Check if embedded keys correspond to the address used to decrypt.
+	vk, err := b.Data.Verification.ToBtcec()
+	if err != nil {
+		return nil, err
+	}
+	ek, err := b.Data.Encryption.ToBtcec()
+	if err != nil {
+		return nil, err
+	}
+
+	return &identity.PublicKey{
+		Verification: vk,
+		Encryption:   ek,
+	}, nil
+}
+
+// ToPublicID constructs the PublicID of this Bitmessage.
+func (b *Bitmessage) ToPublicID() (*identity.PublicID, error) {
+	pub, err := b.ToPublicKey()
+	if err != nil {
+		return nil, err
+	}
+	return identity.NewPublicID(pub, b.Version, b.Stream, b.Data.Behavior, b.Data.Pow)
+}
+
+// From construct the from address of this bitmessage.
+func (b *Bitmessage) From() (Address, error) {
+	pub, err := b.ToPublicID()
+	if err != nil {
+		return nil, err
+	}
+	return pub.Address(), nil
 }
 
 // encodeMessage encodes a Bitmessage so that it can be encrypted.
-func (msg *Bitmessage) encodeMessage(w io.Writer) error {
-	if err := bmutil.WriteVarInt(w, msg.FromAddressVersion); err != nil {
+func (b *Bitmessage) encodeMessage(w io.Writer) error {
+	var err error
+	if err = WriteVarInt(w, b.Version); err != nil {
 		return err
 	}
-	if err := bmutil.WriteVarInt(w, msg.FromStreamNumber); err != nil {
+	if err = WriteVarInt(w, b.Stream); err != nil {
 		return err
 	}
-	err := wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+	if b.Version >= 3 {
+		err = b.Data.Encode(w)
+	} else {
+		err = b.Data.EncodeSimple(w)
+	}
 	if err != nil {
 		return err
 	}
-	if msg.FromAddressVersion >= 3 {
-		if err = msg.Pow.Encode(w); err != nil {
-			return err
-		}
-	}
-	if err = wire.WriteElement(w, msg.Destination); err != nil {
+	if err = wire.WriteElement(w, b.Destination); err != nil {
 		return err
 	}
-	return format.Encode(w, msg.Content)
+	return format.Encode(w, b.Content)
 }
 
 // encodeBroadcast encodes a Bitmessage so that it can be encrypted.
-func (msg *Bitmessage) encodeBroadcast(w io.Writer) error {
-	if err := bmutil.WriteVarInt(w, msg.FromAddressVersion); err != nil {
+func (b *Bitmessage) encodeBroadcast(w io.Writer) error {
+	var err error
+	if err := WriteVarInt(w, b.Version); err != nil {
 		return err
 	}
-	if err := bmutil.WriteVarInt(w, msg.FromStreamNumber); err != nil {
+	if err := WriteVarInt(w, b.Stream); err != nil {
 		return err
 	}
-	err := wire.WriteElements(w, msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+	if b.Version >= 3 {
+		err = b.Data.Encode(w)
+	} else {
+		err = b.Data.EncodeSimple(w)
+	}
 	if err != nil {
 		return err
 	}
-	if msg.FromAddressVersion >= 3 {
-		if err = msg.Pow.Encode(w); err != nil {
-			return err
-		}
-	}
-	return format.Encode(w, msg.Content)
+	return format.Encode(w, b.Content)
 }
 
 // decodeMessage decodes a Bitmessage from its decrypted form.
-func (msg *Bitmessage) decodeMessage(r io.Reader) error {
+func (b *Bitmessage) decodeMessage(r io.Reader) error {
 	var err error
-	if msg.FromAddressVersion, err = bmutil.ReadVarInt(r); err != nil {
+	if b.Version, err = ReadVarInt(r); err != nil {
 		return err
 	}
-	if msg.FromStreamNumber, err = bmutil.ReadVarInt(r); err != nil {
+	if b.Stream, err = ReadVarInt(r); err != nil {
 		return err
 	}
-	msg.SigningKey = &wire.PubKey{}
-	msg.EncryptionKey = &wire.PubKey{}
-	err = wire.ReadElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+	b.Data = &obj.PubKeyData{}
+	if b.Version >= 3 {
+		err = b.Data.Decode(r)
+	} else {
+		err = b.Data.DecodeSimple(r)
+	}
 	if err != nil {
 		return err
 	}
-	if msg.FromAddressVersion >= 3 {
-		msg.Pow = &pow.Data{}
-		if err = msg.Pow.Decode(r); err != nil {
-			return err
-		}
-	}
-	msg.Destination = &hash.Ripe{}
-	if err = wire.ReadElement(r, msg.Destination); err != nil {
+	b.Destination = &hash.Ripe{}
+	if err = wire.ReadElement(r, b.Destination); err != nil {
 		return err
 	}
 
-	if msg.Content, err = format.Decode(r); err != nil {
+	if b.Content, err = format.Decode(r); err != nil {
 		return err
 	}
 
@@ -104,28 +135,25 @@ func (msg *Bitmessage) decodeMessage(r io.Reader) error {
 }
 
 // decodeBroadcast decodes a Bitmessage from its decrypted form.
-func (msg *Bitmessage) decodeBroadcast(r io.Reader) error {
+func (b *Bitmessage) decodeBroadcast(r io.Reader) error {
 	var err error
-	if msg.FromAddressVersion, err = bmutil.ReadVarInt(r); err != nil {
+	if b.Version, err = ReadVarInt(r); err != nil {
 		return err
 	}
-	if msg.FromStreamNumber, err = bmutil.ReadVarInt(r); err != nil {
+	if b.Stream, err = ReadVarInt(r); err != nil {
 		return err
 	}
-	msg.SigningKey = &wire.PubKey{}
-	msg.EncryptionKey = &wire.PubKey{}
-	err = wire.ReadElements(r, &msg.Behavior, msg.SigningKey, msg.EncryptionKey)
+	b.Data = &obj.PubKeyData{}
+	if b.Version >= 3 {
+		err = b.Data.Decode(r)
+	} else {
+		err = b.Data.DecodeSimple(r)
+	}
 	if err != nil {
 		return err
 	}
-	if msg.FromAddressVersion >= 3 {
-		msg.Pow = &pow.Data{}
-		if err = msg.Pow.Decode(r); err != nil {
-			return err
-		}
-	}
 
-	if msg.Content, err = format.Decode(r); err != nil {
+	if b.Content, err = format.Decode(r); err != nil {
 		return err
 	}
 	return nil
