@@ -24,7 +24,7 @@ import (
 
 type incompleteBroadcast interface {
 	Encode(io.Writer) error
-	Encrypt(address *bmutil.Address, data []byte) (obj.Broadcast, error)
+	Encrypt(address bmutil.Address, data []byte) (obj.Broadcast, error)
 }
 
 type incompleteTaglessBroadcast struct {
@@ -45,8 +45,8 @@ func (i *incompleteTaglessBroadcast) Encode(w io.Writer) error {
 	return nil
 }
 
-func (i *incompleteTaglessBroadcast) Encrypt(address *bmutil.Address, data []byte) (obj.Broadcast, error) {
-	encrypted, err := btcec.Encrypt(address.PrivateKeySingleHash().PubKey(), data)
+func (i *incompleteTaglessBroadcast) Encrypt(address bmutil.Address, data []byte) (obj.Broadcast, error) {
+	encrypted, err := btcec.Encrypt(bmutil.V4BroadcastDecryptionKey(address).PubKey(), data)
 
 	if err != nil {
 		return nil, err
@@ -79,8 +79,8 @@ func (i *incompleteTaggedBroadcast) Encode(w io.Writer) error {
 	return nil
 }
 
-func (i *incompleteTaggedBroadcast) Encrypt(address *bmutil.Address, data []byte) (obj.Broadcast, error) {
-	encrypted, err := btcec.Encrypt(address.PrivateKey().PubKey(), data)
+func (i *incompleteTaggedBroadcast) Encrypt(address bmutil.Address, data []byte) (obj.Broadcast, error) {
+	encrypted, err := btcec.Encrypt(bmutil.V5BroadcastDecryptionKey(address).PubKey(), data)
 
 	if err != nil {
 		return nil, err
@@ -178,7 +178,11 @@ func (broadcast *Broadcast) decodeFromDecrypted(r io.Reader) error {
 	return err
 }
 
-func (broadcast *Broadcast) signAndEncrypt(i incompleteBroadcast, private *identity.Private) error {
+func (broadcast *Broadcast) signAndEncrypt(
+	i incompleteBroadcast,
+	address bmutil.Address,
+	private *identity.Private) error {
+
 	// Start signing
 	var b bytes.Buffer
 	err := broadcastEncodeForSigning(&b, i, broadcast.data)
@@ -204,7 +208,7 @@ func (broadcast *Broadcast) signAndEncrypt(i incompleteBroadcast, private *ident
 	}
 
 	// Encrypt
-	broadcast.msg, err = i.Encrypt(&private.Address, b.Bytes())
+	broadcast.msg, err = i.Encrypt(address, b.Bytes())
 
 	if err != nil {
 		return fmt.Errorf("encryption failed: %v", err)
@@ -213,7 +217,7 @@ func (broadcast *Broadcast) signAndEncrypt(i incompleteBroadcast, private *ident
 	return nil
 }
 
-func (broadcast Broadcast) verify(address *bmutil.Address) error {
+func (broadcast Broadcast) verify(address bmutil.Address) error {
 
 	if broadcast.msg == nil {
 		panic("msg is nil")
@@ -228,10 +232,19 @@ func (broadcast Broadcast) verify(address *bmutil.Address) error {
 	if err != nil {
 		return err
 	}
-	id := identity.NewPublic(signKey, encKey, broadcast.data.Pow, broadcast.data.FromAddressVersion, broadcast.data.FromStreamNumber)
+	id, err := identity.NewPublic(
+		signKey, encKey,
+		broadcast.data.Behavior,
+		broadcast.data.Pow,
+		address.Version(), address.Stream())
+	if err != nil {
+		return err
+	}
 
-	genAddr, _ := id.Address.Encode()
-	dencAddr, _ := address.Encode()
+	addr := id.Address()
+
+	genAddr := addr.String()
+	dencAddr := address.String()
 	if dencAddr != genAddr {
 		return fmt.Errorf("Address used for decryption (%s) doesn't match "+
 			"that generated from public key (%s). Possible surreptitious "+
@@ -265,7 +278,10 @@ func (broadcast Broadcast) verify(address *bmutil.Address) error {
 
 // CreateTaglessBroadcast creates a Broadcast that we send over the network,
 // as opposed to one that we receive and decrypt.
-func CreateTaglessBroadcast(expiration time.Time, data *Bitmessage, private *identity.Private) (*Broadcast, error) {
+func CreateTaglessBroadcast(expiration time.Time, data *Bitmessage,
+	private *identity.Private) (*Broadcast, error) {
+
+	address := private.Address()
 
 	if data.Destination != nil {
 		return nil, errors.New("Broadcasts do not have a destination.")
@@ -275,7 +291,7 @@ func CreateTaglessBroadcast(expiration time.Time, data *Bitmessage, private *ide
 		data: data,
 	}
 
-	err := broadcast.signAndEncrypt(&incompleteTaglessBroadcast{expiration, private.Address.Stream}, private)
+	err := broadcast.signAndEncrypt(&incompleteTaglessBroadcast{expiration, address.Stream()}, address, private)
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +301,10 @@ func CreateTaglessBroadcast(expiration time.Time, data *Bitmessage, private *ide
 
 // CreateTaggedBroadcast creates a Broadcast that we send over the network,
 // as opposed to one that we receive and decrypt.
-func CreateTaggedBroadcast(expires time.Time, data *Bitmessage, tag *hash.Sha, private *identity.Private) (*Broadcast, error) {
+func CreateTaggedBroadcast(expires time.Time, data *Bitmessage, tag *hash.Sha,
+	private *identity.Private) (*Broadcast, error) {
+
+	address := private.Address()
 
 	if data.Destination != nil {
 		return nil, errors.New("Broadcasts do not have a destination.")
@@ -295,7 +314,7 @@ func CreateTaggedBroadcast(expires time.Time, data *Bitmessage, tag *hash.Sha, p
 		data: data,
 	}
 
-	err := broadcast.signAndEncrypt(&incompleteTaggedBroadcast{expires, private.Address.Stream, tag}, private)
+	err := broadcast.signAndEncrypt(&incompleteTaggedBroadcast{expires, address.Stream(), tag}, address, private)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +322,7 @@ func CreateTaggedBroadcast(expires time.Time, data *Bitmessage, tag *hash.Sha, p
 	return &broadcast, nil
 }
 
-func newBroadcast(msg obj.Broadcast, key *btcec.PrivateKey, address *bmutil.Address) (*Broadcast, error) {
+func newBroadcast(msg obj.Broadcast, key *btcec.PrivateKey, address bmutil.Address) (*Broadcast, error) {
 	encrypted := msg.Encrypted()
 	dec, err := btcec.Decrypt(key, encrypted)
 	if err != nil {
@@ -333,8 +352,8 @@ func newBroadcast(msg obj.Broadcast, key *btcec.PrivateKey, address *bmutil.Addr
 
 // NewTaglessBroadcast takes a broadcast we have received over the network
 // and attempts to decrypt it.
-func NewTaglessBroadcast(msg *obj.TaglessBroadcast, address *bmutil.Address) (*Broadcast, error) {
-	broadcast, err := newBroadcast(msg, address.PrivateKeySingleHash(), address)
+func NewTaglessBroadcast(msg *obj.TaglessBroadcast, address bmutil.Address) (*Broadcast, error) {
+	broadcast, err := newBroadcast(msg, bmutil.V4BroadcastDecryptionKey(address), address)
 	if err != nil {
 		return nil, err
 	}
@@ -344,12 +363,12 @@ func NewTaglessBroadcast(msg *obj.TaglessBroadcast, address *bmutil.Address) (*B
 
 // NewTaggedBroadcast takes a broadcast we have received over the network
 // and attempts to decrypt it.
-func NewTaggedBroadcast(msg *obj.TaggedBroadcast, address *bmutil.Address) (*Broadcast, error) {
-	if subtle.ConstantTimeCompare(msg.Tag[:], address.Tag()) != 1 {
+func NewTaggedBroadcast(msg *obj.TaggedBroadcast, address bmutil.Address) (*Broadcast, error) {
+	if subtle.ConstantTimeCompare(msg.Tag[:], bmutil.Tag(address)) != 1 {
 		return nil, ErrInvalidIdentity
 	}
 
-	broadcast, err := newBroadcast(msg, address.PrivateKey(), address)
+	broadcast, err := newBroadcast(msg, bmutil.V5BroadcastDecryptionKey(address), address)
 	if err != nil {
 		return nil, err
 	}

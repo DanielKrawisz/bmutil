@@ -18,13 +18,18 @@ func TestNewPublic(t *testing.T) {
 		"5K3oNuMzVEWdrtyBAZXrPQwQTSmCGrAZS1groRDQVGDeccLim15",
 		"5HzhkuimkuizxJyw9b7qnFEMtUrAXD25Y5AV1sZ964dSSXReKnb",
 		pow.DefaultNonceTrialsPerByte, pow.DefaultExtraBytes)
-	id := privId.ToPublic()
+	id := privId.Public()
 
-	testId := identity.NewPublic(privId.SigningKey.PubKey(),
-		privId.DecryptionKey.PubKey(), &pow.Data{
+	testId, err := identity.NewPublic(privId.SigningKey.PubKey(),
+		privId.DecryptionKey.PubKey(),
+		identity.BehaviorAck,
+		&pow.Data{
 			NonceTrialsPerByte: pow.DefaultNonceTrialsPerByte,
 			ExtraBytes:         pow.DefaultExtraBytes,
 		}, 4, 1)
+	if err != nil {
+		t.Errorf("Could not create Public: %s", err)
+	}
 
 	if !reflect.DeepEqual(id, testId) {
 		t.Errorf("Created public identity not equal to original.")

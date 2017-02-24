@@ -36,15 +36,15 @@ var (
 // identity. It also signs and encrypts it (if necessary) yielding an object
 // that only needs proof-of-work to be done on it.
 func GeneratePubKey(privID *identity.Private, expiry time.Duration) (PubKey, error) {
-	addr := &privID.Address
+	addr := privID.Address()
 
-	switch addr.Version {
+	switch addr.Version() {
 	case obj.SimplePubKeyVersion:
-		return createSimplePubKey(time.Now().Add(expiry), addr.Stream, privID.Behavior, privID), nil
+		return createSimplePubKey(time.Now().Add(expiry), addr.Stream(), privID.Behavior, privID), nil
 	case obj.ExtendedPubKeyVersion:
-		return createExtendedPubKey(time.Now().Add(expiry), addr.Stream, privID.Behavior, privID)
+		return createExtendedPubKey(time.Now().Add(expiry), addr.Stream(), privID.Behavior, privID)
 	case obj.EncryptedPubKeyVersion:
-		return createDecryptedPubKey(time.Now().Add(expiry), addr.Stream, privID.Behavior, privID)
+		return createDecryptedPubKey(time.Now().Add(expiry), addr.Stream(), privID.Behavior, privID)
 	default:
 		return nil, ErrUnsupportedOp
 	}
@@ -56,7 +56,7 @@ func GeneratePubKey(privID *identity.Private, expiry time.Duration) (PubKey, err
 // ErrInvalidSignature. Else, it returns nil.
 //
 // All necessary fields of the provided wire.PubKeyObject are populated.
-func TryDecryptAndVerifyPubKey(msg obj.Object, address *bmutil.Address) (PubKey, error) {
+func TryDecryptAndVerifyPubKey(msg obj.Object, address bmutil.Address) (PubKey, error) {
 	header := msg.Header()
 
 	if header.ObjectType != wire.ObjectTypePubKey {
@@ -130,7 +130,7 @@ func SignAndEncryptBroadcast(expiration time.Time,
 // fails, it returns ErrInvalidSignature. Else, it returns nil.
 //
 // All necessary fields of the provided wire.BroadcastObject are populated.
-func TryDecryptAndVerifyBroadcast(msg obj.Broadcast, address *bmutil.Address) (*Broadcast, error) {
+func TryDecryptAndVerifyBroadcast(msg obj.Broadcast, address bmutil.Address) (*Broadcast, error) {
 	var b bytes.Buffer
 	msg.Encode(&b)
 

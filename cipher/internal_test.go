@@ -9,6 +9,7 @@ import (
 	"io"
 	"time"
 
+	"github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/format"
 	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/identity"
@@ -38,8 +39,8 @@ func init() {
 	EncKey2, _ = wire.NewPubKey(PrivID2.DecryptionKey.PubKey().SerializeUncompressed()[1:])
 	SignKey2, _ = wire.NewPubKey(PrivID2.SigningKey.PubKey().SerializeUncompressed()[1:])
 
-	Tag1, _ = hash.NewSha(PrivID1.Address.Tag())
-	Tag2, _ = hash.NewSha(PrivID2.Address.Tag())
+	Tag1, _ = hash.NewSha(bmutil.Tag(PrivID1.Address()))
+	Tag2, _ = hash.NewSha(bmutil.Tag(PrivID2.Address()))
 }
 
 func TstGenerateForwardingData(key *wire.PubKey) []byte {
@@ -51,7 +52,7 @@ func TstGenerateForwardingData(key *wire.PubKey) []byte {
 	}
 	attackPub.EncodeForEncryption(&b)
 
-	fd, err := btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+	fd, err := btcec.Encrypt(bmutil.V5BroadcastDecryptionKey(PrivID1.Address()).PubKey(),
 		b.Bytes())
 	if err != nil {
 		panic("could not generate forwardingData")
@@ -69,7 +70,7 @@ func TstGenerateInvalidSig() []byte {
 	attackPub.signature = []byte{0x00}
 	attackPub.EncodeForEncryption(&b)
 
-	invalidSig, err := btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+	invalidSig, err := btcec.Encrypt(bmutil.V5BroadcastDecryptionKey(PrivID1.Address()).PubKey(),
 		b.Bytes())
 	if err != nil {
 		panic("could not generate invalidSig")
@@ -93,7 +94,7 @@ func TstGenerateMismatchSig() []byte {
 	b.Reset()
 	attackPub.EncodeForEncryption(&b)
 
-	mismatchSig, err := btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+	mismatchSig, err := btcec.Encrypt(bmutil.V5BroadcastDecryptionKey(PrivID1.Address()).PubKey(),
 		b.Bytes())
 	if err != nil {
 		panic("could not generate mismatchedSig")
@@ -190,7 +191,7 @@ func TstNewBroadcast(nonce pow.Nonce, expires time.Time, streamNumber uint64,
 
 	var stream uint64
 	if private != nil {
-		stream = private.Address.Stream
+		stream = private.Address().Stream()
 	}
 
 	var msg obj.Broadcast
@@ -264,21 +265,21 @@ func TstGenerateBroadcastErrorData(validPubkey *wire.PubKey) (invSigningKey,
 	attackB, _ := TstNewBroadcast(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 		1, Tag1, nil, 0, 0, 0, &wire.PubKey{}, validPubkey, 0, 0, 1, []byte{0x00}, nil, nil)
 	attackB.encodeForEncryption(&b)
-	invSigningKey, _ = btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+	invSigningKey, _ = btcec.Encrypt(bmutil.V5BroadcastDecryptionKey(PrivID1.Address()).PubKey(),
 		b.Bytes())
 
 	b.Reset()
 	attackB, _ = TstNewBroadcast(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 		1, Tag1, nil, 0, 0, 0, validPubkey, &wire.PubKey{}, 0, 0, 1, []byte{0x00}, nil, nil)
 	attackB.encodeForEncryption(&b)
-	invEncKey, _ = btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+	invEncKey, _ = btcec.Encrypt(bmutil.V5BroadcastDecryptionKey(PrivID1.Address()).PubKey(),
 		b.Bytes())
 
 	b.Reset()
 	attackB, _ = TstNewBroadcast(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 		1, Tag1, nil, 4, 1, 0, validPubkey, validPubkey, 0, 0, 1, []byte{0x00}, nil, nil)
 	attackB.encodeForEncryption(&b)
-	forwardingData, _ = btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+	forwardingData, _ = btcec.Encrypt(bmutil.V5BroadcastDecryptionKey(PrivID1.Address()).PubKey(),
 		b.Bytes())
 
 	b.Reset()
@@ -287,7 +288,7 @@ func TstGenerateBroadcastErrorData(validPubkey *wire.PubKey) (invSigningKey,
 	attackB, _ = TstNewBroadcast(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
 		1, Tag1, nil, 4, 1, 0, sk, ek, 0, 0, 1, []byte{0x00}, nil, nil)
 	attackB.encodeForEncryption(&b)
-	invalidSig, _ = btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+	invalidSig, _ = btcec.Encrypt(bmutil.V5BroadcastDecryptionKey(PrivID1.Address()).PubKey(),
 		b.Bytes())
 
 	b.Reset()
@@ -297,7 +298,7 @@ func TstGenerateBroadcastErrorData(validPubkey *wire.PubKey) (invSigningKey,
 	attackB.signature = sig.Serialize()
 	b.Reset()
 	attackB.encodeForEncryption(&b)
-	mismatchSig, _ = btcec.Encrypt(PrivID1.Address.PrivateKey().PubKey(),
+	mismatchSig, _ = btcec.Encrypt(bmutil.V5BroadcastDecryptionKey(PrivID1.Address()).PubKey(),
 		b.Bytes())
 
 	return
@@ -391,7 +392,7 @@ func TstGenerateMessageErrorData(validPubkey *wire.PubKey) (invDest,
 	b.Reset()
 	attackB.data.SigningKey = &wire.PubKey{}
 	attackB.data.EncryptionKey = validPubkey
-	attackB.data.Destination, _ = hash.NewRipe(PrivID1.Address.Ripe[:])
+	attackB.data.Destination, _ = hash.NewRipe(PrivID1.Address().RipeHash()[:])
 	attackB.encodeForEncryption(&b)
 	invSigningKey, _ = btcec.Encrypt(PrivID1.DecryptionKey.PubKey(), b.Bytes())
 

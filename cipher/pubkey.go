@@ -219,8 +219,8 @@ func (dp *decryptedPubKey) signAndEncrypt(private *identity.Private) error {
 	}
 
 	// Encrypt
-	dp.object.Encrypted, err = btcec.Encrypt(private.Address.PrivateKey().PubKey(),
-		b.Bytes())
+	dp.object.Encrypted, err = btcec.Encrypt(
+		bmutil.V5BroadcastDecryptionKey(private.Address()).PubKey(), b.Bytes())
 	if err != nil {
 		return fmt.Errorf("encryption failed: %v", err)
 	}
@@ -228,14 +228,14 @@ func (dp *decryptedPubKey) signAndEncrypt(private *identity.Private) error {
 	return nil
 }
 
-func (dp *decryptedPubKey) decryptAndVerify(address *bmutil.Address) error {
+func (dp *decryptedPubKey) decryptAndVerify(address bmutil.Address) error {
 	// Try decryption.
 	// Check tag, save decryption cost.
-	if subtle.ConstantTimeCompare(dp.object.Tag[:], address.Tag()) != 1 {
+	if subtle.ConstantTimeCompare(dp.object.Tag[:], bmutil.Tag(address)) != 1 {
 		return ErrInvalidIdentity
 	}
 
-	dec, err := btcec.Decrypt(address.PrivateKey(), dp.object.Encrypted)
+	dec, err := btcec.Decrypt(bmutil.V5BroadcastDecryptionKey(address), dp.object.Encrypted)
 	if err == btcec.ErrInvalidMAC { // decryption failed due to invalid key
 		return ErrInvalidIdentity
 	} else if err != nil { // other reasons
@@ -260,10 +260,13 @@ func (dp *decryptedPubKey) decryptAndVerify(address *bmutil.Address) error {
 	header := dp.object.Header()
 
 	// Check if embedded keys correspond to the address used for decryption.
-	id := identity.NewPublic(signKey, encKey, dp.data.Pow, header.Version, header.StreamNumber)
+	id, err := identity.NewPublic(signKey, encKey, dp.data.Behavior, dp.data.Pow, header.Version, header.StreamNumber)
+	if err != nil {
+		return err
+	}
 
-	genAddr, _ := id.Address.Encode()
-	dencAddr, _ := address.Encode()
+	genAddr := id.Address().String()
+	dencAddr := address.String()
 	if dencAddr != genAddr {
 		return fmt.Errorf("Address used for decryption (%s) doesn't match "+
 			"that generated from public key (%s). Possible surreptitious "+
@@ -298,10 +301,10 @@ func (dp *decryptedPubKey) decryptAndVerify(address *bmutil.Address) error {
 
 func createDecryptedPubKey(expires time.Time, streamNumber uint64,
 	behavior uint32, privID *identity.Private) (*decryptedPubKey, error) {
-	addr := &privID.Address
+	addr := privID.Address()
 
 	var tag hash.Sha
-	copy(tag[:], addr.Tag())
+	copy(tag[:], bmutil.Tag(addr))
 
 	dp := &decryptedPubKey{
 		object: obj.NewEncryptedPubKey(0, expires, streamNumber, &tag, nil),
@@ -316,7 +319,7 @@ func createDecryptedPubKey(expires time.Time, streamNumber uint64,
 	return dp, nil
 }
 
-func newDecryptedPubKey(msg *obj.EncryptedPubKey, address *bmutil.Address) (*decryptedPubKey, error) {
+func newDecryptedPubKey(msg *obj.EncryptedPubKey, address bmutil.Address) (*decryptedPubKey, error) {
 	pk := &decryptedPubKey{
 		object: msg,
 	}

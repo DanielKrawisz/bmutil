@@ -9,6 +9,7 @@ import (
 	"math"
 
 	"github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/btcsuite/btcd/btcec"
 )
@@ -17,19 +18,26 @@ import (
 // encryption and signing keys, POW parameters and the address that contains
 // information about stream number and address version.
 type Public struct {
-	bmutil.Address
+	address bmutil.Address
 	pow.Data
 	VerificationKey *btcec.PublicKey
 	EncryptionKey   *btcec.PublicKey
 	Behavior        uint32
 }
 
-// CreateAddress populates the Address object within the identity based on the
+// createAddress populates the Address object within the identity based on the
 // provided version and stream values and also generates the ripe.
-func (id *Public) CreateAddress(version, stream uint64) {
-	id.Address.Version = version
-	id.Address.Stream = stream
-	copy(id.Address.Ripe[:], id.hash())
+func createAddress(version, stream uint64, ripe []byte) (bmutil.Address, error) {
+	r, err := hash.NewRipe(ripe)
+	if err != nil {
+		return nil, err
+	}
+
+	if version < 4 {
+		return bmutil.NewDepricatedAddress(version, stream, r)
+	}
+
+	return bmutil.NewAddress(version, stream, r)
 }
 
 // hash returns the ripemd160 hash used in the address
@@ -38,8 +46,14 @@ func (id *Public) hash() []byte {
 		id.EncryptionKey.SerializeUncompressed())
 }
 
+// Address returns the address of the id.
+func (id *Public) Address() bmutil.Address {
+	return id.address
+}
+
 // NewPublic creates and initializes an *identity.Public object.
-func NewPublic(verificationKey, encryptionKey *btcec.PublicKey, data *pow.Data, addrVersion, addrStream uint64) *Public {
+func NewPublic(verificationKey, encryptionKey *btcec.PublicKey, behavior uint32,
+	data *pow.Data, addrVersion, addrStream uint64) (*Public, error) {
 
 	id := &Public{
 		EncryptionKey:   encryptionKey,
@@ -57,7 +71,12 @@ func NewPublic(verificationKey, encryptionKey *btcec.PublicKey, data *pow.Data, 
 		id.ExtraBytes = uint64(math.Max(float64(pow.DefaultExtraBytes),
 			float64(data.ExtraBytes)))
 	}
-	id.CreateAddress(addrVersion, addrStream)
 
-	return id
+	var err error
+	id.address, err = createAddress(addrVersion, addrStream, id.hash())
+	if err != nil {
+		return nil, err
+	}
+
+	return id, nil
 }

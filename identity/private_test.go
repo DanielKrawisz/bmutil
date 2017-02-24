@@ -45,13 +45,7 @@ func TestImportExport(t *testing.T) {
 			)
 		}
 
-		address, signingkey, encryptionkey, err := v.ExportWIF()
-		if err != nil {
-			t.Error(
-				"for", pair.address,
-				"got error:", err,
-			)
-		}
+		address, signingkey, encryptionkey := v.ExportWIF()
 
 		if address != pair.address || signingkey != pair.signingkey ||
 			encryptionkey != pair.encryptionkey {
@@ -78,13 +72,8 @@ func TestNewRandom(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	v.Address.Version = 4
-	v.Address.Stream = 1
-	address, signingkey, encryptionkey, err := v.ExportWIF()
-	if err != nil {
-		t.Error("export failed, error:", err)
-		return
-	}
+	v.CreateAddress(4, 1)
+	address, signingkey, encryptionkey := v.ExportWIF()
 	fmt.Println("Address:", address)
 	fmt.Println("Signing Key:", signingkey)
 	fmt.Println("Encryption Key:", encryptionkey)
@@ -121,9 +110,8 @@ func TestNewDeterministic(t *testing.T) {
 		for i, id := range ids {
 			// Make sure to generate address of same version and stream
 			addr, _ := bmutil.DecodeAddress(pair.address[i])
-			id.Address.Version = addr.Version
-			id.Address.Stream = addr.Stream
-			address, _, _, _ := id.ExportWIF()
+			id.CreateAddress(addr.Version(), addr.Stream())
+			address, _, _ := id.ExportWIF()
 			if address != pair.address[i] {
 				t.Errorf("for passphrase %s #%d got %s expected %s",
 					pair.passphrase, i, address, pair.address[i],
@@ -141,12 +129,12 @@ func TestNewHD(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	pvt, err := identity.NewHD(masterKey, 0, 1)
+	pvt, err := identity.NewHD(masterKey, 0, 1, identity.BehaviorAck)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	addr, err := pvt.Address.Encode()
+	addr := pvt.Address().String()
 	expectedAddr := "BM-2cUqid7xty9zteYmu7aKxYiDTzL4k5YYn7"
 	if err != nil {
 		t.Error("encoding address, got error", err)
@@ -194,16 +182,5 @@ func TestErrors(t *testing.T) {
 		"5KQC3fHBCUNyBoXeEpgphrqa314Cvy4beS21Zg1rvrj1FY3Tgqb", 1000, 1000)
 	if err == nil {
 		t.Error("ImportWIF: address mismatch, got no error")
-	}
-
-	// ExportWIF
-	id, err := identity.ImportWIF("BM-2cU2a336vzu7SEuPPa1UTWgrVg8mWiqzpm",
-		"5Ke7eXNJmQYpdeVckePnRWEu5TwPrE9BsZfZZQGGb1jzor9fXit",
-		"5HwY8h5skGnaFaQZZv9UzMJdJbdtuZBjXhsSyDK9msGernqPRDt", 1000, 1000)
-
-	id.Address.Version = 5 // set invalid version
-	_, _, _, err = id.ExportWIF()
-	if err == nil {
-		t.Error("ExportWIF: invalid address, got no error")
 	}
 }

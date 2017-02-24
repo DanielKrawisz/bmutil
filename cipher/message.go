@@ -137,11 +137,11 @@ func (msg *Message) decodeFromDecrypted(r io.Reader) error {
 
 func (msg Message) verify(private *identity.Private) error {
 	// Check if embedded destination ripe corresponds to private identity.
-	if subtle.ConstantTimeCompare(private.Address.Ripe[:],
+	if subtle.ConstantTimeCompare(private.Address().RipeHash()[:],
 		msg.data.Destination.Bytes()) != 1 {
 		return fmt.Errorf("Decryption succeeded but ripes don't match. Got %s"+
 			" expected %s", msg.data.Destination,
-			hex.EncodeToString(private.Address.Ripe[:]))
+			hex.EncodeToString(private.Address().RipeHash()[:]))
 	}
 
 	// Start signature verification

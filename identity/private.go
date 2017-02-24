@@ -32,17 +32,17 @@ const (
 // and signing keys, POW parameters and the address that contains information
 // about stream number and address version.
 type Private struct {
-	bmutil.Address
+	address bmutil.Address
 	pow.Data
 	SigningKey    *btcec.PrivateKey
 	DecryptionKey *btcec.PrivateKey
 	Behavior      uint32
 }
 
-// ToPublic turns a Private identity object into Public identity object.
-func (id *Private) ToPublic() *Public {
+// Public turns a Private identity object into Public identity object.
+func (id *Private) Public() *Public {
 	return &Public{
-		Address: id.Address,
+		address: id.address,
 		Data: pow.Data{
 			NonceTrialsPerByte: id.NonceTrialsPerByte,
 			ExtraBytes:         id.ExtraBytes,
@@ -69,6 +69,11 @@ func (id *Private) ToPubKeyData() *obj.PubKeyData {
 		EncryptionKey:   &encKey,
 		Behavior:        id.Behavior,
 	}
+}
+
+// Address returns the address of the id.
+func (id *Private) Address() bmutil.Address {
+	return id.address
 }
 
 // NewRandom creates an identity based on a random data, with the required
@@ -224,7 +229,10 @@ func NewHD(masterKey *hdkeychain.ExtendedKey, n uint32, stream uint32, behavior 
 		}
 	}
 
-	id.CreateAddress(4, uint64(stream))
+	id.address, err = createAddress(4, uint64(stream), id.hash())
+	if err != nil {
+		return nil, err
+	}
 	id.setDefaultPOWParams()
 	return id, nil
 }
@@ -256,7 +264,7 @@ func ImportWIF(address, signingKeyWif, decryptionKeyWif string,
 	}
 
 	priv := &Private{
-		Address:       *addr,
+		address:       addr,
 		SigningKey:    privSigningKey,
 		DecryptionKey: privDecryptionKey,
 		Data: pow.Data{
@@ -266,8 +274,11 @@ func ImportWIF(address, signingKeyWif, decryptionKeyWif string,
 	}
 
 	// check if everything is valid
-	priv.CreateAddress(addr.Version, addr.Stream) // CreateAddress generates ripe
-	if !bytes.Equal(priv.Address.Ripe[:], addr.Ripe[:]) {
+	priv.address, err = createAddress(addr.Version(), addr.Stream(), priv.hash())
+	if err != nil {
+		return nil, err
+	}
+	if !bytes.Equal(priv.address.RipeHash()[:], addr.RipeHash()[:]) {
 		return nil, errors.New("address does not correspond to private keys")
 	}
 	return priv, nil
@@ -276,15 +287,9 @@ func ImportWIF(address, signingKeyWif, decryptionKeyWif string,
 // ExportWIF exports a Private identity to WIF for storage on disk or use by
 // other software. It exports the address, private signing key and private
 // encryption key.
-func (id *Private) ExportWIF() (address, signingKeyWif, decryptionKeyWif string,
-	err error) {
-
-	copy(id.Address.Ripe[:], id.hash())
-	address, err = id.Address.Encode()
-	if err != nil {
-		err = errors.New("error encoding address: " + err.Error())
-		return
-	}
+func (id *Private) ExportWIF() (address, signingKeyWif, decryptionKeyWif string) {
+	//copy(id.address.RipeHash[:], id.hash())
+	address = id.address.String()
 	signingKeyWif = bmutil.EncodeWIF(id.SigningKey)
 	decryptionKeyWif = bmutil.EncodeWIF(id.DecryptionKey)
 	return
@@ -306,12 +311,4 @@ func hashHelper(signingKey []byte, decryptionKey []byte) []byte {
 func (id *Private) hash() []byte {
 	return hashHelper(id.SigningKey.PubKey().SerializeUncompressed(),
 		id.DecryptionKey.PubKey().SerializeUncompressed())
-}
-
-// CreateAddress populates the Address object within the identity based on the
-// provided version and stream values and also generates the ripe.
-func (id *Private) CreateAddress(version, stream uint64) {
-	id.Address.Version = version
-	id.Address.Stream = stream
-	copy(id.Address.Ripe[:], id.hash())
 }
