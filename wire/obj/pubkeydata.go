@@ -24,15 +24,18 @@ func (pk *PubKeyData) EncodeSimple(w io.Writer) error {
 
 // Encode encodes the PubKeyData to a writer.
 func (pk *PubKeyData) Encode(w io.Writer) error {
-	if err := pk.EncodeSimple(w); err != nil {
+	var err error
+	if err = pk.EncodeSimple(w); err != nil {
 		return err
 	}
 
 	if pk.Pow != nil {
-		err := pk.Pow.Encode(w)
-		if err != nil {
-			return err
-		}
+		err = pk.Pow.Encode(w)
+	} else {
+		err = pow.Default.Encode(w)
+	}
+	if err != nil {
+		return err
 	}
 
 	return nil

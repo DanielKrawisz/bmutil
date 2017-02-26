@@ -16,7 +16,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/DanielKrawisz/bmutil"
+	. "github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/identity"
 	"github.com/DanielKrawisz/bmutil/pow"
@@ -25,24 +25,43 @@ import (
 	"github.com/btcsuite/btcd/btcec"
 )
 
-// PubKey is an interface that makes certain guarantees about the information
-// it contains. It represents a pubkey object that we either created or were
-// able to decrypt. It encapsulates the cryptographic operations required
-// to work with pubkey objects.
-type PubKey interface {
+// PubKeyObject is an interface representing a PubKeyMessage. It represents
+// a pubkey object that we either created or were able to decrypt. It
+// encapsulates the cryptographic operations required to work with pubkey objects.
+type PubKeyObject interface {
 	Object() obj.Object
+	Data() *obj.PubKeyData
 	Behavior() uint32
-	VerificationKey() *wire.PubKey
-	EncryptionKey() *wire.PubKey
 	Pow() *pow.Data
 	Tag() *hash.Sha
 	String() string
 }
 
-func createSimplePubKey(expires time.Time, streamNumber uint64,
-	behavior uint32, privID *identity.PrivateID) *obj.SimplePubKey {
+// ToIdentity transforms a PubKeyObject to an identity.Public
+func ToIdentity(pubkey PubKeyObject) (identity.Public, error) {
+	data := pubkey.Data()
+	k, err := identity.NewPublicKey(data.Verification, data.Encryption)
+	if err != nil {
+		return nil, err
+	}
 
-	return obj.NewSimplePubKey(0, expires, streamNumber, privID.PubKeyData())
+	header := pubkey.Object().Header()
+
+	id, err := identity.NewPublic(k, header.Version, header.StreamNumber,
+		pubkey.Behavior(), pubkey.Pow())
+	if err != nil {
+		return nil, err
+	}
+
+	return id, nil
+}
+
+func createSimplePubKey(expires time.Time, privID *identity.PrivateID) *obj.SimplePubKey {
+
+	data := privID.Data()
+
+	return obj.NewSimplePubKey(0, expires, privID.Address().Stream(), data.Behavior,
+		data.Verification, data.Encryption)
 }
 
 // sign signs an extendedPubKey, populating the
@@ -81,7 +100,7 @@ func signExtendedPubKey(ep *obj.ExtendedPubKey, private *identity.PrivateKey) er
 func verifyExtendedPubKey(ep *obj.ExtendedPubKey) error {
 
 	// Verify validity of secp256k1 public keys.
-	signKey, err := ep.Data.Verification.ToBtcec()
+	signKey, err := ep.Data().Verification.ToBtcec()
 	if err != nil {
 		return err
 	}
@@ -112,10 +131,9 @@ func verifyExtendedPubKey(ep *obj.ExtendedPubKey) error {
 	return nil
 }
 
-func createExtendedPubKey(expires time.Time, streamNumber uint64,
-	behavior uint32, privID *identity.PrivateID) (*obj.ExtendedPubKey, error) {
+func createExtendedPubKey(expires time.Time, privID *identity.PrivateID) (*obj.ExtendedPubKey, error) {
 
-	pk := obj.NewExtendedPubKey(0, expires, streamNumber, privID.PubKeyData(), nil)
+	pk := obj.NewExtendedPubKey(0, expires, privID.Address().Stream(), privID.Data(), nil)
 
 	err := signExtendedPubKey(pk, privID.PrivateKey())
 	if err != nil {
@@ -153,6 +171,10 @@ func (dp *decryptedPubKey) EncryptionKey() *wire.PubKey {
 
 func (dp *decryptedPubKey) Pow() *pow.Data {
 	return dp.data.Pow
+}
+
+func (dp *decryptedPubKey) Data() *obj.PubKeyData {
+	return dp.data
 }
 
 func (dp *decryptedPubKey) Tag() *hash.Sha {
@@ -229,7 +251,7 @@ func (dp *decryptedPubKey) signAndEncrypt(private *identity.PrivateID) error {
 
 	// Encrypt
 	dp.object.Encrypted, err = btcec.Encrypt(
-		bmutil.V5BroadcastDecryptionKey(private.Address()).PubKey(), b.Bytes())
+		V5BroadcastDecryptionKey(private.Address()).PubKey(), b.Bytes())
 	if err != nil {
 		return fmt.Errorf("encryption failed: %v", err)
 	}
@@ -237,14 +259,14 @@ func (dp *decryptedPubKey) signAndEncrypt(private *identity.PrivateID) error {
 	return nil
 }
 
-func (dp *decryptedPubKey) decryptAndVerify(address bmutil.Address) error {
+func (dp *decryptedPubKey) decryptAndVerify(address Address) error {
 	// Try decryption.
 	// Check tag, save decryption cost.
-	if subtle.ConstantTimeCompare(dp.object.Tag[:], bmutil.Tag(address)) != 1 {
+	if subtle.ConstantTimeCompare(dp.object.Tag[:], Tag(address)) != 1 {
 		return ErrInvalidIdentity
 	}
 
-	dec, err := btcec.Decrypt(bmutil.V5BroadcastDecryptionKey(address), dp.object.Encrypted)
+	dec, err := btcec.Decrypt(V5BroadcastDecryptionKey(address), dp.object.Encrypted)
 	if err == btcec.ErrInvalidMAC { // decryption failed due to invalid key
 		return ErrInvalidIdentity
 	} else if err != nil { // other reasons
@@ -257,7 +279,7 @@ func (dp *decryptedPubKey) decryptAndVerify(address bmutil.Address) error {
 	}
 
 	// Verify validity of secp256k1 public keys.
-	public, err := identity.ToPublic(dp.data)
+	public, err := identity.NewPublicKey(dp.data.Verification, dp.data.Encryption)
 	if err != nil {
 		return err
 	}
@@ -265,7 +287,7 @@ func (dp *decryptedPubKey) decryptAndVerify(address bmutil.Address) error {
 	header := dp.object.Header()
 
 	// Check if embedded keys correspond to the address used for decryption.
-	id, err := identity.NewPublicID(public, header.Version,
+	id, err := identity.NewPublic(public, header.Version,
 		header.StreamNumber, dp.data.Behavior, dp.data.Pow)
 	if err != nil {
 		return err
@@ -296,8 +318,9 @@ func (dp *decryptedPubKey) decryptAndVerify(address bmutil.Address) error {
 		return ErrInvalidSignature
 	}
 
-	if !sig.Verify(hash[:], public.Verification) { // Try SHA256 first
-		if !sig.Verify(sha1hash[:], public.Verification) { // then SHA1
+	k := public.Verification.Btcec()
+	if !sig.Verify(hash[:], k) { // Try SHA256 first
+		if !sig.Verify(sha1hash[:], k) { // then SHA1
 			return ErrInvalidSignature
 		}
 	}
@@ -305,16 +328,15 @@ func (dp *decryptedPubKey) decryptAndVerify(address bmutil.Address) error {
 	return nil
 }
 
-func createDecryptedPubKey(expires time.Time, streamNumber uint64,
-	behavior uint32, privID *identity.PrivateID) (*decryptedPubKey, error) {
+func createDecryptedPubKey(expires time.Time, privID *identity.PrivateID) (*decryptedPubKey, error) {
 	addr := privID.Address()
 
 	var tag hash.Sha
-	copy(tag[:], bmutil.Tag(addr))
+	copy(tag[:], Tag(addr))
 
 	dp := &decryptedPubKey{
-		object: obj.NewEncryptedPubKey(0, expires, streamNumber, &tag, nil),
-		data:   privID.PubKeyData(),
+		object: obj.NewEncryptedPubKey(0, expires, privID.Address().Stream(), &tag, nil),
+		data:   privID.Data(),
 	}
 
 	err := dp.signAndEncrypt(privID)
@@ -325,7 +347,7 @@ func createDecryptedPubKey(expires time.Time, streamNumber uint64,
 	return dp, nil
 }
 
-func newDecryptedPubKey(msg *obj.EncryptedPubKey, address bmutil.Address) (*decryptedPubKey, error) {
+func newDecryptedPubKey(msg *obj.EncryptedPubKey, address Address) (*decryptedPubKey, error) {
 	pk := &decryptedPubKey{
 		object: msg,
 	}

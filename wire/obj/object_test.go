@@ -70,7 +70,7 @@ func TestObject(t *testing.T) {
 		t.Fatalf("could not create a pubkey %s", err)
 	}
 	var tag hash.Sha
-	msgSimplePubKey := obj.NewSimplePubKey(123123, expires, 1, &obj.PubKeyData{0, pub1, pub2, nil})
+	msgSimplePubKey := obj.NewSimplePubKey(123123, expires, 1, 0, pub1, pub2)
 	msgExtendedPubKey := obj.NewExtendedPubKey(123123, expires, 1,
 		&obj.PubKeyData{
 			Behavior:     0,

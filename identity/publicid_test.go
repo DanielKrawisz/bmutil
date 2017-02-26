@@ -14,17 +14,20 @@ import (
 )
 
 func TestNewPublic(t *testing.T) {
-	privAddr, _ := identity.ImportWIF("BM-2cXm1jokUVp9Nn1kBtkeMjpxaLJuP3FwET",
+	privAddr, err := identity.ImportWIF("BM-2cXm1jokUVp9Nn1kBtkeMjpxaLJuP3FwET",
 		"5K3oNuMzVEWdrtyBAZXrPQwQTSmCGrAZS1groRDQVGDeccLim15",
 		"5HzhkuimkuizxJyw9b7qnFEMtUrAXD25Y5AV1sZ964dSSXReKnb")
+	if err != nil {
+		t.Fatal("Could not create ID: ", err)
+	}
 	behavior := uint32(identity.BehaviorAck)
 	data := &pow.Data{
 		NonceTrialsPerByte: pow.DefaultNonceTrialsPerByte,
 		ExtraBytes:         pow.DefaultExtraBytes,
 	}
-	id := identity.NewPublicIDFromWIF(privAddr, behavior, data)
+	id := identity.NewPublicFromWIF(privAddr, behavior, data)
 	address := privAddr.Address()
-	testId, err := identity.NewPublicID(
+	testId, err := identity.NewPublic(
 		privAddr.PublicKey(),
 		address.Version(), address.Stream(),
 		behavior, data)

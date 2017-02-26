@@ -89,9 +89,9 @@ func TestPubKeys(t *testing.T) {
 				version)
 		}
 		if !bytes.Equal(v2pk.Signing.PubKey().SerializeUncompressed()[1:],
-			pk.VerificationKey()[:]) ||
+			pk.Data().Verification.Bytes()) ||
 			!bytes.Equal(v2pk.Decryption.PubKey().SerializeUncompressed()[1:],
-				pk.EncryptionKey()[:]) {
+				pk.Data().Encryption.Bytes()) {
 			t.Error("Signing/encryption key mismatch.")
 		}
 	}
@@ -248,7 +248,7 @@ func TestBroadcasts(t *testing.T) {
 	tag1, _ := hash.NewSha(Tag(PrivID1().Address()))
 
 	broadcast1, err := SignAndEncryptBroadcast(
-		TstBroadcastEncryptParams(time.Now().Add(time.Minute*5).Truncate(time.Second),
+		TstBroadcastEncryptParams(t, time.Now().Add(time.Minute*5).Truncate(time.Second),
 			1, tag1, 4, 1, 1, SignKey1, EncKey1,
 			1000, 1000, 1, []byte("Hey there!"), PrivID1()))
 	if err != nil {
@@ -259,7 +259,7 @@ func TestBroadcasts(t *testing.T) {
 	broadcast2ID := ReplaceVersion(PrivID1(), 3)
 
 	broadcast2, err := SignAndEncryptBroadcast(
-		TstBroadcastEncryptParams(time.Now().Add(time.Minute*5).Truncate(time.Second),
+		TstBroadcastEncryptParams(t, time.Now().Add(time.Minute*5).Truncate(time.Second),
 			1, nil, 3, 1, 1, SignKey1, EncKey1,
 			1000, 1000, 1, []byte("Hey there!"), broadcast2ID))
 	if err != nil {
@@ -332,13 +332,12 @@ func TestBroadcasts(t *testing.T) {
 		[]byte{0x00, 0x00})
 	validPubkey, _ := wire.NewPubKey(randId.PubKey().SerializeUncompressed()[1:])
 
-	invSigningKey, invEncKey, forwardingData, invalidSig, mismatchSig := TstGenerateBroadcastErrorData(validPubkey)
+	invSigningKey, invEncKey, forwardingData, invalidSig, mismatchSig := TstGenerateBroadcastErrorData(t, validPubkey)
 
 	tests2 := []struct {
 		broadcast obj.Broadcast
 		address   Address
 	}{
-
 		// Invalid tag.
 		{broadcast1.Object(), PrivID2().Address()},
 
@@ -382,9 +381,9 @@ func TestMessages(t *testing.T) {
 
 	// SignAndEncryptMsg
 	destRipe, _ := hash.NewRipe(PrivID2().Address().RipeHash()[:])
-	message, err := TstSignAndEncryptMessage(0, time.Now().Add(time.Minute*5).
-		Truncate(time.Second), 1, nil, 4, 1, 1, SignKey1, EncKey1, 1000,
-		1000, destRipe, 1, []byte("Hey there!"), []byte{}, nil, PrivID1().PrivateKey(), PrivID2().PublicKey())
+	message, err := TstSignAndEncryptMessage(t, 0, time.Now().Add(time.Minute*5).
+		Truncate(time.Second), 1, nil, 4, 1, 1, SignKey1, EncKey1, nil,
+		destRipe, 1, []byte("Hey there!"), []byte{}, nil, PrivID1().PrivateKey(), PrivID2().PublicKey())
 	if err != nil {
 		t.Errorf("for SignAndEncryptMsg got error %v", err)
 	}
@@ -427,45 +426,46 @@ func TestMessages(t *testing.T) {
 		[]byte{0x00, 0x00})
 	validPubkey, _ := wire.NewPubKey(randId.PubKey().SerializeUncompressed()[1:])
 
-	invDest, invSigningKey, invalidSig, mismatchSig := TstGenerateMessageErrorData(validPubkey)
+	invDest, invSigningKey, invalidSig, mismatchSig := TstGenerateMessageErrorData(t, validPubkey)
 
 	tests2 := []struct {
 		msg    *Message
 		privId *identity.PrivateID
 	}{
 		// Invalid private identity.
-		{TstNewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
-			1, invPrivID, 4, 1, 1, nil, nil, 1000, 1000,
+		{TstNewTstMessage(t, 0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+			1, invPrivID, 4, 1, 1, nil, nil, nil,
 			nil, 1, nil, nil, nil), PrivID1()},
 
 		// Decryption failure.
-		{TstNewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
-			1, []byte{0x00, 0x00}, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
+		{TstNewTstMessage(t, 0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+			1, []byte{0x00, 0x00}, 4, 1, 1, nil, nil,
+			&pow.Data{1000, 1000}, nil, 1,
 			nil, nil, nil), PrivID1()},
 
 		// Undecodable decrypted data.
-		{TstNewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
-			1, undecData, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
+		{TstNewTstMessage(t, 0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+			1, undecData, 4, 1, 1, nil, nil, nil, nil, 1,
 			nil, nil, nil), PrivID1()},
 
 		// Invalid destination ripe.
-		{TstNewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
-			1, invDest, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
+		{TstNewTstMessage(t, 0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+			1, invDest, 4, 1, 1, nil, nil, nil, nil, 1,
 			nil, nil, nil), PrivID1()},
 
 		// Invalid embedded signing key.
-		{TstNewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
-			1, invSigningKey, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
+		{TstNewTstMessage(t, 0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+			1, invSigningKey, 4, 1, 1, nil, nil, nil, nil, 1,
 			nil, nil, nil), PrivID1()},
 
 		// Invalid signature.
-		{TstNewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
-			1, invalidSig, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
+		{TstNewTstMessage(t, 0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+			1, invalidSig, 4, 1, 1, nil, nil, nil, nil, 1,
 			nil, nil, nil), PrivID1()},
 
 		// Signature mismatch.
-		{TstNewMessage(0, time.Now().Add(time.Minute*5).Truncate(time.Second),
-			1, mismatchSig, 4, 1, 1, nil, nil, 1000, 1000, nil, 1,
+		{TstNewTstMessage(t, 0, time.Now().Add(time.Minute*5).Truncate(time.Second),
+			1, mismatchSig, 4, 1, 1, nil, nil, nil, nil, 1,
 			nil, nil, nil), PrivID1()},
 	}
 

@@ -121,6 +121,10 @@ func (broadcast *Broadcast) Bitmessage() *Bitmessage {
 	return broadcast.bm
 }
 
+func (broadcast *Broadcast) String() string {
+	return fmt.Sprintf("Broadcast{%s, %s, %v}", broadcast.msg.String(), broadcast.bm.String(), broadcast.sig)
+}
+
 // encodeForSigning encodes Broadcast so that it can be hashed and signed.
 func (broadcast *Broadcast) encodeForSigning(w io.Writer) error {
 	if broadcast.msg == nil {
@@ -223,20 +227,7 @@ func (broadcast Broadcast) verify(address bmutil.Address) error {
 		panic("msg is nil")
 	}
 
-	// Check if embedded keys correspond to the address used to decrypt.
-	public, err := broadcast.bm.ToPublicKey()
-	if err != nil {
-		return err
-	}
-
-	id, err := identity.NewPublicID(
-		public,
-		address.Version(), address.Stream(),
-		broadcast.bm.Data.Behavior,
-		broadcast.bm.Data.Pow)
-	if err != nil {
-		return err
-	}
+	id := broadcast.bm.Public
 
 	addr := id.Address()
 
@@ -250,7 +241,7 @@ func (broadcast Broadcast) verify(address bmutil.Address) error {
 
 	// Start signature verification
 	var b bytes.Buffer
-	err = broadcast.encodeForSigning(&b)
+	err := broadcast.encodeForSigning(&b)
 	if err != nil {
 		return err
 	}
@@ -265,8 +256,9 @@ func (broadcast Broadcast) verify(address bmutil.Address) error {
 		return ErrInvalidSignature
 	}
 
-	if !sig.Verify(hash[:], public.Verification) { // Try SHA256 first
-		if !sig.Verify(sha1hash[:], public.Verification) { // then SHA1
+	pk := id.Key().Verification
+	if !sig.Verify(hash[:], pk.Btcec()) { // Try SHA256 first
+		if !sig.Verify(sha1hash[:], pk.Btcec()) { // then SHA1
 			return ErrInvalidSignature
 		}
 	}

@@ -52,19 +52,13 @@ func TestPubKeyH(t *testing.T) {
 	}
 
 	// Set hash from byte slice and ensure contents match.
-	err = pubkey.SetBytes(pubKey.Bytes())
+	pubkey, err = wire.NewPubKey(pubKey.Bytes())
 	if err != nil {
 		t.Errorf("SetBytes: %v", err)
 	}
 	if !pubkey.IsEqual(pubKey) {
 		t.Errorf("IsEqual: pubkey contents mismatch - got: %v, want: %v",
 			pubkey, pubKey)
-	}
-
-	// Invalid size for SetBytes.
-	err = pubkey.SetBytes([]byte{0x00})
-	if err == nil {
-		t.Errorf("SetBytes: failed to received expected err - got: nil")
 	}
 
 	// Invalid size for NewPubKey.

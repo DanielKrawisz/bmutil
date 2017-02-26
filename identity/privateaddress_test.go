@@ -28,7 +28,7 @@ func TestImportExport(t *testing.T) {
 		v, err := identity.ImportWIF(pair.address, pair.signingkey,
 			pair.encryptionkey)
 		if err != nil {
-			t.Error(
+			t.Fatal(
 				"for", pair.address,
 				"got error:", err.Error(),
 			)

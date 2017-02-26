@@ -163,7 +163,7 @@ func TstBasePubKey(pub1, pub2 *wire.PubKey) *SimplePubKey {
 			wire.ObjectTypePubKey,
 			2,
 			1),
-		Data: &PubKeyData{
+		data: &PubKeyData{
 			Behavior:     0,
 			Verification: pub1,
 			Encryption:   pub2,
@@ -179,7 +179,7 @@ func TstExpandedPubKey(pub1, pub2 *wire.PubKey) *ExtendedPubKey {
 			wire.ObjectTypePubKey,
 			3,
 			1),
-		Data: &PubKeyData{
+		data: &PubKeyData{
 			Behavior:     0,
 			Verification: pub1,
 			Encryption:   pub2,

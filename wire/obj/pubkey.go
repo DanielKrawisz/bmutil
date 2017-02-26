@@ -72,13 +72,13 @@ func DecodePubKeySignature(r io.Reader) (signature []byte, err error) {
 // response to MsgGetPubKey.
 type SimplePubKey struct {
 	header *wire.ObjectHeader
-	Data   *PubKeyData
+	data   *PubKeyData
 }
 
 // NewSimplePubKey returns a new object message that conforms to the Message
 // interface using the passed parameters and defaults for the remaining fields.
 func NewSimplePubKey(nonce pow.Nonce, expiration time.Time,
-	streamNumber uint64, data *PubKeyData) *SimplePubKey {
+	streamNumber uint64, behavior uint32, vk, ek *wire.PubKey) *SimplePubKey {
 	return &SimplePubKey{
 		header: wire.NewObjectHeader(
 			nonce,
@@ -87,17 +87,17 @@ func NewSimplePubKey(nonce pow.Nonce, expiration time.Time,
 			SimplePubKeyVersion,
 			streamNumber,
 		),
-		Data: &PubKeyData{
-			Behavior:     data.Behavior,
-			Verification: data.Verification,
-			Encryption:   data.Encryption,
+		data: &PubKeyData{
+			Behavior:     behavior,
+			Verification: vk,
+			Encryption:   ek,
 		},
 	}
 }
 
 func (p *SimplePubKey) decodePayload(r io.Reader) error {
-	p.Data = &PubKeyData{}
-	return p.Data.DecodeSimple(r)
+	p.data = &PubKeyData{}
+	return p.data.DecodeSimple(r)
 }
 
 // Decode is part of the Message interface and it reads a new SimplePubKey
@@ -125,7 +125,7 @@ func (p *SimplePubKey) Decode(r io.Reader) error {
 }
 
 func (p *SimplePubKey) encodePayload(w io.Writer) error {
-	return p.Data.EncodeSimple(w)
+	return p.data.EncodeSimple(w)
 }
 
 // Encode is part of the Message interface and it writes the SimplePubKey
@@ -170,19 +170,24 @@ func (p *SimplePubKey) MsgObject() *wire.MsgObject {
 	return wire.NewMsgObject(p.header, p.Payload())
 }
 
-// Behavior returns the PubKey's behavior (currently unused).
+// Data returns the PubKey's PubKeyData object.
+func (p *SimplePubKey) Data() *PubKeyData {
+	return p.data
+}
+
+// Behavior returns the PubKey's behavior.
 func (p *SimplePubKey) Behavior() uint32 {
-	return p.Data.Behavior
+	return p.data.Behavior
 }
 
 // VerificationKey return's the PubKey's VerificationKey
 func (p *SimplePubKey) VerificationKey() *wire.PubKey {
-	return p.Data.Verification
+	return p.data.Verification
 }
 
 // EncryptionKey return's the PubKey's EncryptionKey
 func (p *SimplePubKey) EncryptionKey() *wire.PubKey {
-	return p.Data.Encryption
+	return p.data.Encryption
 }
 
 // Pow return's the key's pow data. For the SimplePubKey, this is nil.
@@ -204,7 +209,7 @@ func (p *SimplePubKey) Object() Object {
 // String returns a representation of the SimplePubKey as a
 // human-readable string.
 func (p *SimplePubKey) String() string {
-	return "SimplePubKey{" + p.header.String() + ", " + p.Data.String() + "}"
+	return "SimplePubKey{" + p.header.String() + ", " + p.data.String() + "}"
 }
 
 // ExtendedPubKey implements the Message and Object interfaces and represents an
@@ -212,13 +217,13 @@ func (p *SimplePubKey) String() string {
 // information about the proof-of-work required to send a message.
 type ExtendedPubKey struct {
 	header    *wire.ObjectHeader
-	Data      *PubKeyData
+	data      *PubKeyData
 	Signature []byte
 }
 
 func (p *ExtendedPubKey) decodePayload(r io.Reader) error {
-	p.Data = &PubKeyData{}
-	err := p.Data.Decode(r)
+	p.data = &PubKeyData{}
+	err := p.data.Decode(r)
 	if err != nil {
 		return nil
 	}
@@ -251,7 +256,7 @@ func (p *ExtendedPubKey) Decode(r io.Reader) error {
 }
 
 func (p *ExtendedPubKey) encodePayload(w io.Writer) error {
-	err := p.Data.Encode(w)
+	err := p.data.Encode(w)
 	if err != nil {
 		return err
 	}
@@ -277,7 +282,7 @@ func (p *ExtendedPubKey) EncodeForSigning(w io.Writer) error {
 		return err
 	}
 
-	return p.Data.Encode(w)
+	return p.data.Encode(w)
 }
 
 // Command returns the protocol command string for the message. This is part
@@ -311,24 +316,29 @@ func (p *ExtendedPubKey) MsgObject() *wire.MsgObject {
 	return wire.NewMsgObject(p.header, p.Payload())
 }
 
-// Behavior returns the PubKey's behavior (currently unused).
+// Data returns the PubKey's PubKeyData object.
+func (p *ExtendedPubKey) Data() *PubKeyData {
+	return p.data
+}
+
+// Behavior returns the PubKey's behavior.
 func (p *ExtendedPubKey) Behavior() uint32 {
-	return p.Data.Behavior
+	return p.data.Behavior
 }
 
 // VerificationKey return's the PubKey's VerificationKey
 func (p *ExtendedPubKey) VerificationKey() *wire.PubKey {
-	return p.Data.Verification
+	return p.data.Verification
 }
 
 // EncryptionKey return's the PubKey's EncryptionKey
 func (p *ExtendedPubKey) EncryptionKey() *wire.PubKey {
-	return p.Data.Encryption
+	return p.data.Encryption
 }
 
 // Pow return's the key's pow data. For the SimplePubKey, this is nil.
 func (p *ExtendedPubKey) Pow() *pow.Data {
-	return p.Data.Pow
+	return p.data.Pow
 }
 
 // Tag return's the key's pow data. For the SimplePubKey, this is nil.
@@ -343,7 +353,7 @@ func (p *ExtendedPubKey) Object() Object {
 }
 
 func (p *ExtendedPubKey) String() string {
-	return "SimplePubKey{" + p.header.String() + ", " + p.Data.String() + ", " + hex.EncodeToString(p.Signature) + "}"
+	return "SimplePubKey{" + p.header.String() + ", " + p.data.String() + ", " + hex.EncodeToString(p.Signature) + "}"
 }
 
 // NewExtendedPubKey returns a new object message that conforms to the Message
@@ -358,7 +368,7 @@ func NewExtendedPubKey(nonce pow.Nonce, expiration time.Time, streamNumber uint6
 			ExtendedPubKeyVersion,
 			streamNumber,
 		),
-		Data:      data,
+		data:      data,
 		Signature: signature,
 	}
 }

@@ -41,9 +41,9 @@ func (pubkey *PubKey) Bytes() []byte {
 	return newPubkey
 }
 
-// SetBytes sets the bytes which represent the hash. An error is returned if
+// setBytes sets the bytes which represent the hash. An error is returned if
 // the number of bytes passed in is not PubKeySize.
-func (pubkey *PubKey) SetBytes(newPubkey []byte) error {
+func (pubkey *PubKey) setBytes(newPubkey []byte) error {
 	nhlen := len(newPubkey)
 	if nhlen != PubKeySize {
 		return fmt.Errorf("invalid pub key length of %v, want %v", nhlen,
@@ -73,7 +73,7 @@ func (pubkey *PubKey) ToBtcec() (key *btcec.PublicKey, err error) {
 // the number of bytes passed in is not PubKeySize.
 func NewPubKey(newHash []byte) (*PubKey, error) {
 	var pubkey PubKey
-	err := pubkey.SetBytes(newHash)
+	err := pubkey.setBytes(newHash)
 	if err != nil {
 		return nil, err
 	}

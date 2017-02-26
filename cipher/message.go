@@ -156,18 +156,15 @@ func (msg Message) verify(private *identity.PrivateID) error {
 	sha1hash := sha1.Sum(b.Bytes())
 
 	// Verify
-	pubSigningKey, err := msg.bm.Data.Verification.ToBtcec()
-	if err != nil {
-		return err
-	}
+	pvk := msg.bm.Public.Key().Verification.Btcec()
 
 	sig, err := btcec.ParseSignature(msg.sig, btcec.S256())
 	if err != nil {
 		return ErrInvalidSignature
 	}
 
-	if !sig.Verify(hash[:], pubSigningKey) { // Try SHA256 first
-		if !sig.Verify(sha1hash[:], pubSigningKey) { // then SHA1
+	if !sig.Verify(hash[:], pvk) { // Try SHA256 first
+		if !sig.Verify(sha1hash[:], pvk) { // then SHA1
 			return ErrInvalidSignature
 		}
 	}

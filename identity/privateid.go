@@ -14,17 +14,17 @@ type PrivateID struct {
 }
 
 // Public turns a Private identity object into Public identity object.
-func (id *PrivateID) Public() *PublicID {
-	return &PublicID{
+func (id *PrivateID) Public() Public {
+	return &publicID{
 		address:  id.PrivateAddress.public(),
 		pow:      id.pow,
 		behavior: id.behavior,
 	}
 }
 
-// PubKeyData turns a PrivateID type into PubKeyData type.
-func (id *PrivateID) PubKeyData() *obj.PubKeyData {
-	return id.Public().PubKeyData()
+// Data turns a PrivateID type into PubKeyData type.
+func (id *PrivateID) Data() *obj.PubKeyData {
+	return id.Public().Data()
 }
 
 // Pow returns the pow.Data for this identity.

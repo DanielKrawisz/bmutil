@@ -1,56 +1,66 @@
 package identity
 
 import (
+	"fmt"
 	"math"
 
 	. "github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/pow"
-	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/obj"
 )
 
-// BehaviorAck says whether a message to this pubkey should include
-// an ack.
-const BehaviorAck = 1
-
-// PublicID contains the identity of the remote user, which includes public
-// encryption and signing keys, and POW parameters.
-type PublicID struct {
+// publicID implements the Public interface and contains the identity of
+// the remote user, which includes public encryption and signing keys,
+// and POW parameters.
+type publicID struct {
 	address  *publicAddress
 	behavior uint32
 	pow      *pow.Data
 }
 
+func (id *publicID) String() string {
+	return fmt.Sprintf("publicid{%s, behavior:%d, %s}", id.address.String(), id.behavior, id.pow.String())
+}
+
 // PublicKey returns the keys in this PublicID
-func (id *PublicID) PublicKey() *PublicKey {
+func (id *publicID) Key() *PublicKey {
 	return &id.address.PublicKey
 }
 
 // Address returns Address that is derived from this ID
-func (id *PublicID) Address() Address {
+func (id *publicID) Address() Address {
 	return id.address.Address()
 }
 
-// PubKeyData turns a PublicID type into PubKeyData type.
-func (id *PublicID) PubKeyData() *obj.PubKeyData {
-	var verKey, encKey wire.PubKey
-	key := id.PublicKey()
-	vk := key.Verification.SerializeUncompressed()[1:]
-	ek := key.Encryption.SerializeUncompressed()[1:]
-	copy(verKey[:], vk)
-	copy(encKey[:], ek)
+// Data returns a PubKeyData type.
+func (id *publicID) Data() *obj.PubKeyData {
+	key := id.Key()
 
 	return &obj.PubKeyData{
 		Pow:          id.pow,
-		Verification: &verKey,
-		Encryption:   &encKey,
+		Verification: key.Verification.Wire(),
+		Encryption:   key.Encryption.Wire(),
 		Behavior:     id.behavior,
 	}
 }
 
+// Pow returns the pow.Data for this identity.
+func (id *publicID) Pow() *pow.Data {
+	if id.pow == nil {
+		return &pow.Default
+	}
+
+	return id.pow
+}
+
+// Behavior returns the Behavior value for this id.
+func (id *publicID) Behavior() uint32 {
+	return id.behavior
+}
+
 // newPublicID creates and initializes an *identity.Public object.
-func newPublicID(address *publicAddress, behavior uint32, data *pow.Data) *PublicID {
-	id := PublicID{
+func newPublicID(address *publicAddress, behavior uint32, data *pow.Data) *publicID {
+	id := publicID{
 		address:  address,
 		behavior: behavior,
 	}
@@ -70,22 +80,4 @@ func newPublicID(address *publicAddress, behavior uint32, data *pow.Data) *Publi
 	}
 
 	return &id
-}
-
-// NewPublicID creates and initializes an *identity.PublicID object.
-func NewPublicID(public *PublicKey, version, stream uint64, behavior uint32,
-	data *pow.Data) (*PublicID, error) {
-	address, err := newPublicAddress(public, version, stream)
-	if err != nil {
-		return nil, err
-	}
-
-	return newPublicID(address, behavior, data), nil
-}
-
-// NewPublicIDFromWIF creates an *identity.Public object from a PrivateAddress
-func NewPublicIDFromWIF(address *PrivateAddress, behavior uint32,
-	data *pow.Data) *PublicID {
-
-	return newPublicID(address.public(), behavior, data)
 }

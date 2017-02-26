@@ -25,12 +25,7 @@ func TestPubKey(t *testing.T) {
 
 	now := time.Now()
 	tests := []wire.Message{
-		obj.NewSimplePubKey(83928, now, 1,
-			&obj.PubKeyData{
-				Behavior:     0,
-				Verification: pubKey1,
-				Encryption:   pubKey2,
-			}),
+		obj.NewSimplePubKey(83928, now, 1, 0, pubKey1, pubKey2),
 		obj.NewExtendedPubKey(83928, now, 1,
 			&obj.PubKeyData{
 				Behavior:     0,
@@ -70,8 +65,7 @@ func TestPubKeyWire(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 	sig := make([]byte, 64)
 	encrypted := make([]byte, 512)
-	msgBase := obj.NewSimplePubKey(83928, expires, 1,
-		&obj.PubKeyData{0, pubKey1, pubKey2, nil})
+	msgBase := obj.NewSimplePubKey(83928, expires, 1, 0, pubKey1, pubKey2)
 	msgExpanded := obj.NewExtendedPubKey(83928, expires, 1,
 		&obj.PubKeyData{
 			Behavior:     0,

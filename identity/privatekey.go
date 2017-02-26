@@ -28,8 +28,8 @@ type PrivateKey struct {
 // Public turns a Private identity object into Public identity object.
 func (pk *PrivateKey) Public() *PublicKey {
 	return &PublicKey{
-		Verification: pk.Signing.PubKey(),
-		Encryption:   pk.Decryption.PubKey(),
+		Verification: (*PubKey)(pk.Signing.PubKey()),
+		Encryption:   (*PubKey)(pk.Decryption.PubKey()),
 	}
 }
 

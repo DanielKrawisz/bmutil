@@ -1,67 +1,95 @@
-// Copyright (c) 2015 Monetas
-// Copyright 2016 Daniel Krawisz.
-// Use of this source code is governed by an ISC
-// license that can be found in the LICENSE file.
-
 package identity
 
 import (
-	"crypto/sha512"
+	"io"
 
-	"github.com/DanielKrawisz/bmutil/hash"
+	. "github.com/DanielKrawisz/bmutil"
+	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire/obj"
-	"github.com/btcsuite/btcd/btcec"
-	"golang.org/x/crypto/ripemd160"
 )
 
-// PublicKey contains the identity of the remote user, which includes public
-// encryption and signing keys, and POW parameters.
-type PublicKey struct {
-	Verification *btcec.PublicKey
-	Encryption   *btcec.PublicKey
+// BehaviorAck says whether a message to this pubkey should include
+// an ack.
+const BehaviorAck = 1
+
+// Public refers to a public identity.
+type Public interface {
+	Address() Address
+	Key() *PublicKey
+	Data() *obj.PubKeyData
+	Behavior() uint32
+	Pow() *pow.Data
+	String() string
 }
 
-// hashHelper exists for delegating the task of hash calculation
-func hashHelper(signingKey []byte, decryptionKey []byte) []byte {
-	sha := sha512.New()
-	ripemd := ripemd160.New()
-
-	sha.Write(signingKey)
-	sha.Write(decryptionKey)
-
-	ripemd.Write(sha.Sum(nil)) // take ripemd160 of required elements
-	return ripemd.Sum(nil)     // Get the hash
-}
-
-// Hash returns the ripemd160 hash used in the address
-func (id *PublicKey) Hash() *hash.Ripe {
-	r, _ := hash.NewRipe(hashHelper(id.Verification.SerializeUncompressed(),
-		id.Encryption.SerializeUncompressed()))
-	return r
-}
-
-// NewPublicKey creates and initializes an *identity.Public object.
-func NewPublicKey(verificationKey, encryptionKey *btcec.PublicKey) *PublicKey {
-	return &PublicKey{
-		Encryption:   encryptionKey,
-		Verification: verificationKey,
+// Encode serializes the public identity.
+func Encode(w io.Writer, pub Public) error {
+	var err error
+	address := pub.Address()
+	if err = WriteVarInt(w, address.Version()); err != nil {
+		return err
 	}
+	if err = WriteVarInt(w, address.Stream()); err != nil {
+		return err
+	}
+
+	data := pub.Data()
+	if address.Version() >= 3 {
+		return data.Encode(w)
+	}
+
+	return data.EncodeSimple(w)
 }
 
-// ToPublic constructs the PublicKey object.
-func ToPublic(pk *obj.PubKeyData) (*PublicKey, error) {
-	// Check if embedded keys correspond to the address used to decrypt.
-	vk, err := pk.Verification.ToBtcec()
-	if err != nil {
-		return nil, err
-	}
-	ek, err := pk.Encryption.ToBtcec()
+// Decode reads a public identity as a publicID type, which implements Public.
+func Decode(r io.Reader) (Public, error) {
+	version, err := ReadVarInt(r)
 	if err != nil {
 		return nil, err
 	}
 
-	return &PublicKey{
-		Verification: vk,
-		Encryption:   ek,
-	}, nil
+	stream, err := ReadVarInt(r)
+	if err != nil {
+		return nil, err
+	}
+
+	data := &obj.PubKeyData{}
+	if version >= 3 {
+		err = data.Decode(r)
+	} else {
+		err = data.DecodeSimple(r)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	pk, err := NewPublicKey(data.Verification, data.Encryption)
+	if err != nil {
+		return nil, err
+	}
+
+	pa, err := newPublicAddress(pk, version, stream)
+	if err != nil {
+		return nil, err
+	}
+
+	return newPublicID(pa, data.Behavior, data.Pow), nil
+}
+
+// NewPublic creates and initializes an *identity.PublicID object.
+func NewPublic(public *PublicKey, version, stream uint64, behavior uint32,
+	data *pow.Data) (Public, error) {
+	address, err := newPublicAddress(public, version, stream)
+	if err != nil {
+		return nil, err
+	}
+
+	return newPublicID(address, behavior, data), nil
+}
+
+// NewPublicFromWIF creates an *identity.Public object from a PrivateAddress
+func NewPublicFromWIF(address *PrivateAddress, behavior uint32,
+	data *pow.Data) Public {
+
+	return newPublicID(address.public(), behavior, data)
 }
