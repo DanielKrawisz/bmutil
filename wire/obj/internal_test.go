@@ -5,8 +5,10 @@
 package obj
 
 import (
+	"testing"
 	"time"
 
+	. "github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
@@ -38,6 +40,48 @@ func (p *ExtendedPubKey) SetHeader(h *wire.ObjectHeader) {
 
 func (p *EncryptedPubKey) SetHeader(h *wire.ObjectHeader) {
 	p.header = h
+}
+
+func MakeAddress(t *testing.T, version, stream uint64, ripeBytes []byte) Address {
+	var a Address
+	var err error
+	ripe, err := hash.NewRipe(ripeBytes)
+	if err != nil {
+		t.Fatalf("could not make a ripe hash: %s", err)
+	}
+
+	if version == 4 {
+		a, err = NewAddress(version, stream, ripe)
+	} else {
+		a, err = NewDepricatedAddress(version, stream, ripe)
+	}
+
+	if err != nil {
+		t.Fatalf("could not create address: %s", err)
+	}
+
+	return a
+}
+
+func MakeGetPubKey(
+	nonce pow.Nonce,
+	expiration time.Time,
+	version, stream uint64,
+	ripe *hash.Ripe,
+	tag *hash.Sha) *GetPubKey {
+
+	// Limit the timestamp to one second precision since the protocol
+	// doesn't support better.
+	return &GetPubKey{
+		header: wire.NewObjectHeader(
+			nonce,
+			expiration,
+			wire.ObjectTypeGetPubKey,
+			version,
+			stream),
+		Ripe: ripe,
+		Tag:  tag,
+	}
 }
 
 // TstTaggedBroadcast is a broadcast from a v4 address (includes a tag).

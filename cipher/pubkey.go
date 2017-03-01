@@ -262,7 +262,7 @@ func (dp *decryptedPubKey) signAndEncrypt(private *identity.PrivateID) error {
 func (dp *decryptedPubKey) decryptAndVerify(address Address) error {
 	// Try decryption.
 	// Check tag, save decryption cost.
-	if subtle.ConstantTimeCompare(dp.object.Tag[:], Tag(address)) != 1 {
+	if subtle.ConstantTimeCompare(dp.object.Tag[:], Tag(address)[:]) != 1 {
 		return ErrInvalidIdentity
 	}
 
@@ -332,7 +332,7 @@ func createDecryptedPubKey(expires time.Time, privID *identity.PrivateID) (*decr
 	addr := privID.Address()
 
 	var tag hash.Sha
-	copy(tag[:], Tag(addr))
+	copy(tag[:], Tag(addr)[:])
 
 	dp := &decryptedPubKey{
 		object: obj.NewEncryptedPubKey(0, expires, privID.Address().Stream(), &tag, nil),

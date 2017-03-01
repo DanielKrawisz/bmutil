@@ -357,7 +357,7 @@ func NewTaglessBroadcast(msg *obj.TaglessBroadcast, address bmutil.Address) (*Br
 // NewTaggedBroadcast takes a broadcast we have received over the network
 // and attempts to decrypt it.
 func NewTaggedBroadcast(msg *obj.TaggedBroadcast, address bmutil.Address) (*Broadcast, error) {
-	if subtle.ConstantTimeCompare(msg.Tag[:], bmutil.Tag(address)) != 1 {
+	if subtle.ConstantTimeCompare(msg.Tag[:], bmutil.Tag(address)[:]) != 1 {
 		return nil, ErrInvalidIdentity
 	}
 

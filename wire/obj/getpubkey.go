@@ -12,6 +12,7 @@ import (
 	"io"
 	"time"
 
+	. "github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/pow"
 	"github.com/DanielKrawisz/bmutil/wire"
@@ -142,8 +143,7 @@ func (msg *GetPubKey) MsgObject() *wire.MsgObject {
 // NewGetPubKey returns a new object message that conforms to the
 // Message interface using the passed parameters and defaults for the remaining
 // fields.
-func NewGetPubKey(nonce pow.Nonce, expiration time.Time, version, streamNumber uint64,
-	ripe *hash.Ripe, tag *hash.Sha) *GetPubKey {
+func NewGetPubKey(nonce pow.Nonce, expiration time.Time, address Address) *GetPubKey {
 
 	// Limit the timestamp to one second precision since the protocol
 	// doesn't support better.
@@ -152,9 +152,9 @@ func NewGetPubKey(nonce pow.Nonce, expiration time.Time, version, streamNumber u
 			nonce,
 			expiration,
 			wire.ObjectTypeGetPubKey,
-			version,
-			streamNumber),
-		Ripe: ripe,
-		Tag:  tag,
+			address.Version(),
+			address.Stream()),
+		Ripe: address.RipeHash(),
+		Tag:  Tag(address),
 	}
 }

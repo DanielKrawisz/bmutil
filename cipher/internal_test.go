@@ -421,8 +421,8 @@ func init() {
 	EncKey2, err = wire.NewPubKey(PrivKey2().Decryption.PubKey().SerializeUncompressed()[1:])
 	SignKey2, err = wire.NewPubKey(PrivKey2().Signing.PubKey().SerializeUncompressed()[1:])
 
-	Tag1, err = hash.NewSha(Tag(PrivID1().Address()))
-	Tag2, err = hash.NewSha(Tag(PrivID2().Address()))
+	Tag1 = Tag(PrivID1().Address())
+	Tag2 = Tag(PrivID2().Address())
 
 	if err != nil {
 		panic(err.Error())

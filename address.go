@@ -258,10 +258,10 @@ func DoubleSha512(addr Address) []byte {
 // Tag calculates tag corresponding to the Bitmessage address. According to
 // protocol specifications, it is the second half of the double SHA-512 hash
 // of version, stream and ripe concatenated together.
-func Tag(addr Address) []byte {
-	var a = make([]byte, 32)
-	copy(a, DoubleSha512(addr)[32:])
-	return a
+func Tag(addr Address) *hash.Sha {
+	var a hash.Sha
+	copy(a[:], DoubleSha512(addr)[32:])
+	return &a
 }
 
 // V4BroadcastDecryptionKey generates the decryption private key used to decrypt v4

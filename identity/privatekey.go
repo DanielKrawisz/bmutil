@@ -141,7 +141,7 @@ func NewDeterministic(passphrase string, initialZeros uint64, n int) ([]*Private
 // Master key must be a private master key generated according to BIP32. `n' is
 // the n'th identity to generate. NewHD also generates a v4 address based on the
 // specified stream.
-func NewHD(masterKey *hdkeychain.ExtendedKey, n uint32, stream uint32) (*PrivateKey, error) {
+func NewHD(masterKey *hdkeychain.ExtendedKey, n uint32, stream uint64) (*PrivateKey, error) {
 
 	if !masterKey.IsPrivate() {
 		return nil, errors.New("master key must be private")
@@ -160,7 +160,7 @@ func NewHD(masterKey *hdkeychain.ExtendedKey, n uint32, stream uint32) (*Private
 	}
 
 	// m / purpose' / identity' / stream'
-	s, err := i.Child(hdkeychain.HardenedKeyStart + stream)
+	s, err := i.Child(hdkeychain.HardenedKeyStart + uint32(stream))
 	if err != nil {
 		return nil, err
 	}

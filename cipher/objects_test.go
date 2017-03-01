@@ -88,11 +88,11 @@ func TestPubKeys(t *testing.T) {
 			t.Errorf("For version expected %d got %d", PrivID1().Address().Version(),
 				version)
 		}
+		dd := pk.Data()
 		if !bytes.Equal(v2pk.Signing.PubKey().SerializeUncompressed()[1:],
-			pk.Data().Verification.Bytes()) ||
+			dd.Verification[:]) ||
 			!bytes.Equal(v2pk.Decryption.PubKey().SerializeUncompressed()[1:],
-				pk.Data().Encryption.Bytes()) {
-			t.Error("Signing/encryption key mismatch.")
+				dd.Encryption[:]) {
 		}
 	}
 
@@ -245,7 +245,7 @@ func TestBroadcasts(t *testing.T) {
 	// SignAndEncryptBroadcast
 
 	// v5 broadcast
-	tag1, _ := hash.NewSha(Tag(PrivID1().Address()))
+	tag1 := Tag(PrivID1().Address())
 
 	broadcast1, err := SignAndEncryptBroadcast(
 		TstBroadcastEncryptParams(t, time.Now().Add(time.Minute*5).Truncate(time.Second),

@@ -33,7 +33,7 @@ func TestGetPubKeyWire(t *testing.T) {
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
 
 	// empty tag, something in ripe
-	msgRipe := obj.NewGetPubKey(83928, expires, 2, 1, ripe, nil)
+	msgRipe := obj.MakeGetPubKey(83928, expires, 2, 1, ripe, nil)
 
 	// empty ripe, something in tag
 	tagBytes := make([]byte, hash.ShaSize)
@@ -42,7 +42,7 @@ func TestGetPubKeyWire(t *testing.T) {
 	if err != nil {
 		t.Fatalf("could not make a tag hash %s", err)
 	}
-	msgTag := obj.NewGetPubKey(83928, expires, 4, 1, nil, tag)
+	msgTag := obj.MakeGetPubKey(83928, expires, 4, 1, nil, tag)
 
 	RipeEncoded := []byte{
 		0x00, 0x00, 0x00, 0x00, 0x00, 0x01, 0x47, 0xd8, // 83928 nonce

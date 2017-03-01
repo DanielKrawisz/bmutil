@@ -52,12 +52,8 @@ func TestObject(t *testing.T) {
 	// ripe-based getpubkey message
 	ripeBytes := make([]byte, 20)
 	ripeBytes[0] = 1
-	ripe, err := hash.NewRipe(ripeBytes)
-	if err != nil {
-		t.Fatalf("could not make a ripe hash %s", err)
-	}
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	msgGetPubKey := obj.NewGetPubKey(123123, expires, 2, 1, ripe, nil)
+	msgGetPubKey := obj.NewGetPubKey(123123, expires, obj.MakeAddress(t, 2, 1, ripeBytes))
 
 	pub1Bytes, pub2Bytes := make([]byte, 64), make([]byte, 64)
 	pub2Bytes[0] = 1

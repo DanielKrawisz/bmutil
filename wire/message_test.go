@@ -17,6 +17,7 @@ import (
 	"testing"
 	"time"
 
+	. "github.com/DanielKrawisz/bmutil"
 	"github.com/DanielKrawisz/bmutil/hash"
 	"github.com/DanielKrawisz/bmutil/wire"
 	"github.com/DanielKrawisz/bmutil/wire/fixed"
@@ -38,6 +39,27 @@ func makeHeader(bmnet wire.BitmessageNet, command string,
 	binary.BigEndian.PutUint32(buf[16:], payloadLen)
 	binary.BigEndian.PutUint32(buf[20:], checksum)
 	return buf
+}
+
+func makeAddress(t *testing.T, version, stream uint64, ripeBytes []byte) Address {
+	var a Address
+	var err error
+	ripe, err := hash.NewRipe(ripeBytes)
+	if err != nil {
+		t.Fatalf("could not make a ripe hash: %s", err)
+	}
+
+	if version == 4 {
+		a, err = NewAddress(version, stream, ripe)
+	} else {
+		a, err = NewDepricatedAddress(version, stream, ripe)
+	}
+
+	if err != nil {
+		t.Fatalf("could not create address: %s", err)
+	}
+
+	return a
 }
 
 // TestMessage tests the Read/WriteMessage and Read/WriteMessageN API.
@@ -82,12 +104,8 @@ func TestMessage(t *testing.T) {
 	// ripe-based getpubkey message
 	ripeBytes := make([]byte, 20)
 	ripeBytes[0] = 1
-	ripe, err := hash.NewRipe(ripeBytes)
-	if err != nil {
-		t.Fatalf("could not make a ripe hash %s", err)
-	}
 	expires := time.Unix(0x495fab29, 0) // 2009-01-03 12:15:05 -0600 CST)
-	msgGetPubKey := obj.NewGetPubKey(123123, expires, 2, 1, ripe, nil)
+	msgGetPubKey := obj.NewGetPubKey(123123, expires, makeAddress(t, 2, 1, ripeBytes))
 
 	pub1Bytes, pub2Bytes := make([]byte, 64), make([]byte, 64)
 	pub2Bytes[0] = 1
