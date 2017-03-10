@@ -9,6 +9,8 @@ import (
 	"io"
 )
 
+type Target uint64
+
 // Nonce represents a number at the head of an object message which
 // is used for the proof of work.
 type Nonce uint64

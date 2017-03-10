@@ -51,7 +51,7 @@ func TestCalculateTarget(t *testing.T) {
 
 	for n, tc := range tests {
 		target := pow.CalculateTarget(tc.payloadLen, tc.ttl, data)
-		if target != tc.targetValue {
+		if target != pow.Target(tc.targetValue) {
 			t.Errorf("for test #%d got %d expected %d", n, target,
 				tc.targetValue)
 		}
@@ -76,7 +76,7 @@ var doTests = []doTest{
 func TestDoSequential(t *testing.T) {
 	for n, tc := range doTests {
 		initialHash, _ := hex.DecodeString(tc.initialHashStr)
-		nonce := pow.DoSequential(tc.target, initialHash)
+		nonce := pow.DoSequential(pow.Target(tc.target), initialHash)
 		if nonce != tc.nonce {
 			t.Errorf("for test #%d got %d expected %d", n, nonce, tc.nonce)
 		}
@@ -88,7 +88,7 @@ func TestDoParallel(t *testing.T) {
 
 	for n, tc := range doTests {
 		initialHash, _ := hex.DecodeString(tc.initialHashStr)
-		nonce := pow.DoParallel(tc.target, initialHash, runtime.NumCPU())
+		nonce := pow.DoParallel(pow.Target(tc.target), initialHash, runtime.NumCPU())
 		if nonce < tc.nonce { // >= is permitted
 			t.Errorf("for test #%d got %d expected %d", n, nonce, tc.nonce)
 		}

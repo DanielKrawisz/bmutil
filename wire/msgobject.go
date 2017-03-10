@@ -7,7 +7,6 @@ package wire
 
 import (
 	"bytes"
-	"encoding/binary"
 	"encoding/hex"
 	"fmt"
 	"io"
@@ -106,19 +105,12 @@ func (msg *MsgObject) CheckPow(data pow.Data, refTime time.Time) bool {
 	ttl := uint64(msg.Header().Expiration().Unix() - refTime.Unix())
 
 	obj := Encode(msg)
-	msgHash := hash.Sha512(obj[8:]) // exclude nonce value in the beginning
 	payloadLength := uint64(len(obj))
+	nonce := msg.Header().Nonce
 
-	hashData := make([]byte, 8+len(msgHash))
-	copy(hashData[:8], obj[:8]) // nonce
-	copy(hashData[8:], msgHash)
-	resultHash := hash.DoubleSha512(hashData)
+	msgHash := hash.Sha512(obj[8:]) // exclude nonce value in the beginning
 
-	powValue := binary.BigEndian.Uint64(resultHash[0:8])
-
-	target := pow.CalculateTarget(payloadLength, ttl, data)
-
-	return powValue <= target
+	return pow.Check(pow.CalculateTarget(payloadLength, ttl, data), nonce, msgHash)
 }
 
 // Copy creates a new MsgObject identical to the original after a deep copy.
